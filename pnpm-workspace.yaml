@@ -1,0 +1,7 @@
+packages:
+  - protocol
+  - js
+  # - react   # 成包后再加
+
+allowBuilds:
+  esbuild: true

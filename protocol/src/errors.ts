@@ -1,0 +1,23 @@
+/**
+ * 协议错误码常量（单一真源，spec 5.4）。
+ *
+ * 不提供可能误导重复付款的通用 `retryable` 布尔。
+ * 仅保留实际会被产出的错误码；新增码须同时有产出点。
+ */
+
+export const ErrorCode = {
+    INVALID_OPTIONS: 'INVALID_OPTIONS',
+    ELEMENT_CONFLICT: 'ELEMENT_CONFLICT',
+    INSTANCE_DESTROYED: 'INSTANCE_DESTROYED',
+    CHECKOUT_BUSY: 'CHECKOUT_BUSY',
+    VALIDATION_ERROR: 'VALIDATION_ERROR',
+    SESSION_LOAD_FAILED: 'SESSION_LOAD_FAILED',
+    RUNTIME_LOAD_FAILED: 'RUNTIME_LOAD_FAILED',
+    PROTOCOL_UNSUPPORTED: 'PROTOCOL_UNSUPPORTED',
+    REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',
+    PAYMENT_FLOW_ERROR: 'PAYMENT_FLOW_ERROR',
+    UNSUPPORTED_CAPABILITY: 'UNSUPPORTED_CAPABILITY',
+} as const;
+
+/** 错误码字面量联合类型。 */
+export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];

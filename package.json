@@ -1,0 +1,14 @@
+{
+    "name": "@sunbay/checkout-sdk-web",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Sunbay Checkout Web SDK monorepo 根（workspace 容器，不发布）。",
+    "type": "module",
+    "scripts": {
+        "build": "pnpm --filter @sunbay/checkout-sdk-protocol run build && pnpm --filter @sunbay/checkout-sdk-js run build",
+        "build:protocol": "pnpm --filter @sunbay/checkout-sdk-protocol run build",
+        "build:js": "pnpm --filter @sunbay/checkout-sdk-js run build",
+        "type-check": "pnpm -r run type-check",
+        "test": "pnpm -r run test"
+    }
+}
