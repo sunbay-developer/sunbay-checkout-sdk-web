@@ -71,7 +71,8 @@ function createMockTransport(): MockTransport {
 function makeElement(
     transport: MockTransport,
     type: ElementType,
-    elementId = 'el_1'
+    elementId = 'el_1',
+    colorScheme?: 'light' | 'dark' | 'auto'
 ): CheckoutElement {
     return new CheckoutElement({
         elementId,
@@ -79,6 +80,7 @@ function makeElement(
         hostOrigin: HOST_ORIGIN,
         checkoutId: CHECKOUT_ID,
         transport,
+        colorScheme,
     });
 }
 
@@ -193,6 +195,35 @@ describe('CheckoutElement.mount', () => {
         });
         await expect(mounted).rejects.toMatchObject({ code: ErrorCode.RUNTIME_LOAD_FAILED });
         expect(container.querySelector('iframe')).toBeNull();
+    });
+});
+
+describe('CheckoutElement colorScheme 透传 iframe src', () => {
+    it('提供 colorScheme 时 iframe src 带 colorScheme=<值>', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_cs', 'dark');
+        const container = makeContainer('t-cs-dark');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('colorScheme=dark');
+    });
+
+    it("colorScheme='auto' 同样透传", () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_cs2', 'auto');
+        const container = makeContainer('t-cs-auto');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('colorScheme=auto');
+    });
+
+    it('未提供 colorScheme 时 iframe src 不含 colorScheme 参数', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_cs3');
+        const container = makeContainer('t-cs-none');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('colorScheme');
     });
 });
 

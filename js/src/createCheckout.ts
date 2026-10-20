@@ -140,6 +140,7 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
         transport,
         capabilities: initResp.capabilities,
         session: initResp.session,
+        colorScheme: opts.appearance?.colorScheme,
     });
 }
 

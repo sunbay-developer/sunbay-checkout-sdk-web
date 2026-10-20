@@ -3,6 +3,7 @@ import { createCheckout } from '../src/createCheckout';
 import { CheckoutInstance } from '../src/CheckoutInstance';
 import {
     ErrorCode,
+    type Appearance,
     type CommandName,
     type InitializeResp,
     type PaymentOutcome,
@@ -128,13 +129,15 @@ function createMockTransport(): MockTransport {
 
 /** 启动 createCheckout 并在下一 tick 驱动 hello，返回实例与 mock。 */
 async function bootstrap(
-    overrides?: (t: MockTransport) => void
+    overrides?: (t: MockTransport) => void,
+    createOpts?: { appearance?: Appearance }
 ): Promise<{ instance: CheckoutInstance; transport: MockTransport }> {
     const transport = createMockTransport();
     overrides?.(transport);
     const promise = createCheckout({
         sessionId: 'sess_1',
         hostOrigin: HOST_ORIGIN,
+        appearance: createOpts?.appearance,
         __transportFactory: () => transport,
     });
     // 等到 createHiddenIframe 已调用 & onHello 已注册后再触发握手。
@@ -216,6 +219,33 @@ describe('CheckoutInstance.create 互斥', () => {
         expect(() => instance.create('expressCheckout')).toThrowError(
             expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
         );
+    });
+});
+
+describe('CheckoutInstance colorScheme 透传', () => {
+    it("以 appearance.colorScheme='dark' 创建实例并 mount element → iframe src 含 colorScheme=dark", async () => {
+        const { instance } = await bootstrap(undefined, {
+            appearance: { colorScheme: 'dark' },
+        });
+        const element = instance.create('card');
+        const container = document.createElement('div');
+        container.id = 'cs-instance-target';
+        document.body.appendChild(container);
+
+        void element.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('colorScheme=dark');
+
+        document.body.innerHTML = '';
+    });
+
+    it("updateCheckout({ appearance: { colorScheme: 'light' } }) 发 updateCheckout 命令且 payload 含该 colorScheme", async () => {
+        const { instance, transport } = await bootstrap();
+        const patch: { appearance: Appearance } = { appearance: { colorScheme: 'light' } };
+        await instance.updateCheckout(patch);
+        const req = transport.requests.find((r) => r.name === 'updateCheckout');
+        expect(req).toBeDefined();
+        expect(req?.payload).toMatchObject({ appearance: { colorScheme: 'light' } });
     });
 });
 

@@ -53,6 +53,13 @@ export interface CheckoutElementOptions {
     transport: ElementTransport;
     /** 初始 Element 配置（随 createElement 下发）。 */
     initialOptions?: ElementOptions;
+    /**
+     * 初始配色方案（来自 createCheckout 的 appearance.colorScheme）。
+     * 仅当提供时拼进 iframe src 的 `&colorScheme=<值>`，使托管 iframe 在首帧即按该
+     * 配色渲染（无闪）。缺省时不拼接，由托管侧按默认（light）处理。运行时切换走
+     * updateCheckout 命令，不走此处。
+     */
+    colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 /** 事件 payload 的公共结构（含 elementId，用于按自身句柄过滤）。 */
@@ -118,6 +125,8 @@ export class CheckoutElement {
     private readonly checkoutId: string;
     private readonly transport: ElementTransport;
     private options: ElementOptions | undefined;
+    /** 初始配色方案（拼进 iframe src；缺省不拼）。 */
+    private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
 
     private status: ElementStatus = 'created';
     private container: HTMLElement | null = null;
@@ -142,6 +151,7 @@ export class CheckoutElement {
         this.checkoutId = opts.checkoutId;
         this.transport = opts.transport;
         this.options = opts.initialOptions;
+        this.colorScheme = opts.colorScheme;
         this.installInputActions();
         this.installExpressAvailability();
     }
@@ -430,10 +440,16 @@ export class CheckoutElement {
         return node instanceof HTMLElement ? node : null;
     }
 
-    /** 解析 iframe src：拆分字段走 /sdk/field/，其余走 /sdk/element/，带 checkoutId。 */
+    /**
+     * 解析 iframe src：拆分字段走 /sdk/field/，其余走 /sdk/element/，带 checkoutId；
+     * 若提供了初始 colorScheme，则追加 `&colorScheme=<值>`（首帧无闪）。
+     */
     private resolveSrc(): string {
         const segment = FIELD_TYPES.includes(this.type) ? 'field' : 'element';
-        const query = `?checkoutId=${encodeURIComponent(this.checkoutId)}`;
+        let query = `?checkoutId=${encodeURIComponent(this.checkoutId)}`;
+        if (this.colorScheme) {
+            query += `&colorScheme=${encodeURIComponent(this.colorScheme)}`;
+        }
         return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
     }
 

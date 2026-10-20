@@ -62,6 +62,11 @@ export interface CheckoutInstanceOptions {
     capabilities: string[];
     /** initialize 返回的初始会话视图。 */
     session: PublicSessionView;
+    /**
+     * 初始配色方案（来自 createCheckout 的 appearance.colorScheme）。
+     * 透传给每个 create 出的 Element，拼进其 iframe src（首帧无闪）。缺省不拼接。
+     */
+    colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 /** confirm 可选参数（对齐 ConfirmReq，去掉由实例生成的 operationId）。 */
@@ -108,6 +113,8 @@ export class CheckoutInstance {
     private readonly hostOrigin: string;
     private readonly transport: InstanceTransport;
     private session: PublicSessionView;
+    /** 初始配色方案（透传给 create 出的每个 Element 的 iframe src）。 */
+    private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
 
     /** 已创建的 Element（按 elementId 索引）。 */
     private readonly elements = new Map<string, CheckoutElement>();
@@ -134,6 +141,7 @@ export class CheckoutInstance {
         this.hostOrigin = opts.hostOrigin;
         this.transport = opts.transport;
         this.session = opts.session;
+        this.colorScheme = opts.colorScheme;
 
         this.paymentResultHandler = (payload: unknown): void => {
             this.handlePaymentResult(payload);
@@ -166,6 +174,7 @@ export class CheckoutInstance {
             checkoutId: this.checkoutId,
             transport: this.transport,
             initialOptions: options,
+            colorScheme: this.colorScheme,
         };
         const element = CheckoutElement.create(elementOpts);
         this.elements.set(elementId, element);
