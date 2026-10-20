@@ -4,3 +4,8 @@ dist/
 *.log
 coverage/
 .superpowers/
+
+# env files (local credentials, never commit)
+.env
+.env.*
+!.env.example

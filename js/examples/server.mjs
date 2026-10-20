@@ -36,15 +36,52 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 const STATIC_ROOT = join(__dirname, '..');
 
-/** Demo 配置：从环境变量读取，带 dev 默认值。生产请改为真实商户凭据。 */
+/**
+ * 加载同目录 `.env.local`（本地商户凭据，git 忽略）。Node 20.6+ 内置
+ * `process.loadEnvFile`，零外部依赖。文件不存在时静默跳过（允许改用 shell 环境变量
+ * 或 `node --env-file` 传入）。
+ */
+try {
+    process.loadEnvFile(join(__dirname, '.env.local'));
+} catch {
+    // .env.local 不存在：允许用 shell 环境变量 / --env-file 提供凭据。
+}
+
+/**
+ * Demo 配置：商户凭据必须由环境变量提供，不内置明文默认值。
+ * `port` / `openApiUrl` / `currency` 为非敏感项，缺省回退到 dev 默认值。
+ */
 const CONFIG = {
     port: Number(process.env.PORT ?? 8080),
     openApiUrl: process.env.OPEN_API_URL ?? 'https://open.sunbay-dev.com',
-    apiKey: process.env.API_KEY ?? 'btbrZjaplK3K7TreFjjpFVaK4dg6TcDn',
-    appId: process.env.APP_ID ?? 'smz7g4g99uc8f5o4',
-    merchantId: process.env.MERCHANT_ID ?? 'M1000000011',
+    apiKey: process.env.API_KEY,
+    appId: process.env.APP_ID,
+    merchantId: process.env.MERCHANT_ID,
     currency: process.env.CURRENCY ?? 'USD',
 };
+
+/**
+ * 校验必填商户凭据：缺任一项即打印可操作提示并退出（exit 1），避免用占位/空值
+ * 发起无效下单。不回显任何凭据值。
+ */
+const MISSING_ENV = ['API_KEY', 'APP_ID', 'MERCHANT_ID'].filter((key) => !process.env[key]);
+if (MISSING_ENV.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error(
+        [
+            '',
+            '  ✗ Demo server 启动失败：缺少商户凭据环境变量：',
+            `    ${MISSING_ENV.join(', ')}`,
+            '',
+            '  请在 js/examples/.env.local 配置（参考 .env.example），或经 shell / --env-file 提供：',
+            '    API_KEY=<商户 API Key>',
+            '    APP_ID=<商户 appId>',
+            '    MERCHANT_ID=<商户号>',
+            '',
+        ].join('\n')
+    );
+    process.exit(1);
+}
 
 /** 静态文件扩展名 → Content-Type。 */
 const MIME = {
