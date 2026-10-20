@@ -158,6 +158,16 @@
         <label for="hostOrigin">Checkout 托管地址 (hostOrigin)</label>
         <input id="hostOrigin" type="text" value="http://localhost:3000" />
 
+        <label for="integration">接入方式 (integration)</label>
+        <select id="integration">
+            <option value="fields">拆分卡字段（cardNumber / cardExpiry / cardCvc 三个 iframe）</option>
+            <option value="element">组合卡 Element（card，单个 iframe 内含完整卡表单）</option>
+        </select>
+        <p class="hint">
+            两种接入方式的配色都由 appearance.colorScheme 控制：初始配色随 createCheckout 传入，
+            运行时用下方按钮切换。选择后点「① 创建订单并初始化」挂载对应方式；切换方式需重新初始化。
+        </p>
+
         <label for="sessionId">Session ID（留空则调用本站后端下单生成）</label>
         <input id="sessionId" type="text" placeholder="cs_xxx（直接填入已有会话）" />
 
@@ -168,18 +178,27 @@
             <option value="auto">auto（跟随系统）</option>
         </select>
 
-        <label>卡号 (cardNumber)</label>
-        <div id="card-number" class="field"></div>
+        <!-- 拆分卡字段接入：三个独立 iframe（cardNumber / cardExpiry / cardCvc）。 -->
+        <div id="fields-group">
+            <label>卡号 (cardNumber)</label>
+            <div id="card-number" class="field"></div>
 
-        <div class="row">
-            <div>
-                <label>有效期 (cardExpiry)</label>
-                <div id="card-expiry" class="field"></div>
+            <div class="row">
+                <div>
+                    <label>有效期 (cardExpiry)</label>
+                    <div id="card-expiry" class="field"></div>
+                </div>
+                <div>
+                    <label>安全码 (cardCvc)</label>
+                    <div id="card-cvc" class="field"></div>
+                </div>
             </div>
-            <div>
-                <label>安全码 (cardCvc)</label>
-                <div id="card-cvc" class="field"></div>
-            </div>
+        </div>
+
+        <!-- 组合卡 Element 接入：单个 iframe（card）内含完整卡表单。 -->
+        <div id="element-group" hidden>
+            <label>组合卡 Element (card)</label>
+            <div id="card-element" class="field"></div>
         </div>
 
         <button id="init-btn" type="button">① 创建订单并初始化</button>
@@ -201,6 +220,9 @@
                 'use strict';
 
                 const hostOriginInput = document.getElementById('hostOrigin');
+                const integrationSelect = document.getElementById('integration');
+                const fieldsGroup = document.getElementById('fields-group');
+                const elementGroup = document.getElementById('element-group');
                 const sessionIdInput = document.getElementById('sessionId');
                 const initSchemeSelect = document.getElementById('initScheme');
                 const initBtn = document.getElementById('init-btn');
@@ -221,6 +243,9 @@
                         b.disabled = !enabled;
                     });
                 }
+
+                /** 持有已就绪的 CheckoutInstance。 */
+                let checkout = null;
 
                 /**
                  * 把所选 colorScheme 应用到「商户页自身」(<html data-demo>)。
@@ -248,8 +273,33 @@
                     applyMerchantPageScheme(initSchemeSelect.value);
                 });
 
-                /** 持有已就绪的 CheckoutInstance。 */
-                let checkout = null;
+                /**
+                 * 按所选接入方式显隐对应挂载区（初始化前的选择）。
+                 * - 'fields'：显示拆分卡三字段，隐藏组合卡 Element；
+                 * - 'element'：反之。
+                 */
+                function applyIntegrationVisibility(integration) {
+                    const isElement = integration === 'element';
+                    fieldsGroup.hidden = isElement;
+                    elementGroup.hidden = !isElement;
+                }
+
+                // 页面载入即按下拉应用显隐；切换时同步（并提示需重新初始化）。
+                applyIntegrationVisibility(integrationSelect.value);
+                integrationSelect.addEventListener('change', function () {
+                    applyIntegrationVisibility(integrationSelect.value);
+                    // 切换接入方式需重新初始化：重置实例与按钮状态。
+                    checkout = null;
+                    setSwitcherEnabled(false);
+                    initBtn.disabled = false;
+                    show(
+                        '已切换接入方式为「' +
+                            (integrationSelect.value === 'element'
+                                ? '组合卡 Element'
+                                : '拆分卡字段') +
+                            '」，请点「① 创建订单并初始化」重新挂载。'
+                    );
+                });
 
                 /**
                  * 调本站后端创建支付会话（服务端持密钥下单，返回 sessionId）。
@@ -306,16 +356,26 @@
                             show('收到 error 事件：', evt);
                         });
 
-                        // 挂载三个拆分卡字段（配色随主题变化，便于直观观察切换）。
-                        await checkout.create('cardNumber').mount('#card-number');
-                        await checkout.create('cardExpiry').mount('#card-expiry');
-                        await checkout.create('cardCvc').mount('#card-cvc');
+                        // 按所选接入方式挂载；两种方式的配色都由 appearance.colorScheme 控制，
+                        // 初始随上面 createCheckout 传入，运行时随下方按钮切换。
+                        const integration = integrationSelect.value;
+                        if (integration === 'element') {
+                            // 组合卡 Element：单个 iframe（card）内含完整卡表单。
+                            await checkout.create('card').mount('#card-element');
+                        } else {
+                            // 拆分卡字段：三个独立 iframe。
+                            await checkout.create('cardNumber').mount('#card-number');
+                            await checkout.create('cardExpiry').mount('#card-expiry');
+                            await checkout.create('cardCvc').mount('#card-cvc');
+                        }
 
                         setSwitcherEnabled(true);
                         show(
-                            '初始化完成（初始配色=' +
+                            '初始化完成（接入方式=' +
+                                (integration === 'element' ? '组合卡 Element' : '拆分卡字段') +
+                                '，初始配色=' +
                                 initScheme +
-                                '）。点下方 light / dark / auto 按钮即可运行时切换，观察卡字段配色变化。'
+                                '）。点下方 light / dark / auto 按钮即可运行时切换，观察配色实时变化。'
                         );
                     } catch (err) {
                         initBtn.disabled = false;
