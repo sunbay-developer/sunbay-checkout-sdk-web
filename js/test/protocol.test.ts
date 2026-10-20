@@ -153,6 +153,9 @@ describe('protocol error codes', () => {
 import { EVENT_NAMES, isEventName } from '@sunbay/checkout-sdk-protocol';
 import type {
     Appearance,
+    AppearanceVariables,
+    AppearanceRuleTarget,
+    AppearanceRuleStyle,
     AvailableWallets,
     EventName,
     EventPayloadMap,
@@ -169,8 +172,7 @@ import type {
 describe('protocol Appearance colorScheme', () => {
     it("带 colorScheme:'dark' 的 Appearance 类型检查通过且 JSON 往返保留 colorScheme", () => {
         const appearance: Appearance = {
-            theme: 'default',
-            variables: { '--brand': '#000' },
+            variables: { colorPrimary: '#000' },
             colorScheme: 'dark',
         };
         const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
@@ -188,7 +190,7 @@ describe('protocol Appearance colorScheme', () => {
     });
 
     it('colorScheme 可省略（向后兼容）', () => {
-        const appearance: Appearance = { theme: 'default' };
+        const appearance: Appearance = { variables: { colorPrimary: '#000' } };
         const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
         expect(decoded).toEqual(appearance);
         expect(decoded.colorScheme).toBeUndefined();
@@ -377,5 +379,51 @@ describe('protocol expressCheckout per-wallet options', () => {
         const google: GooglePayOptions = {};
         expect(apple.buttonTheme).toBeUndefined();
         expect(google.buttonTheme).toBeUndefined();
+    });
+});
+
+describe('protocol appearance variables + rules', () => {
+    it('Appearance 接受白名单 variables + rules + colorScheme', () => {
+        const variables: AppearanceVariables = {
+            colorPrimary: '#3366ff',
+            borderRadius: '8px',
+            fontFamily: 'Inter, sans-serif',
+        };
+        const rules: NonNullable<Appearance['rules']> = {
+            input: { color: '#111111' },
+            'input:focus': { 'border-color': '#3366ff' },
+            cardBrand: { opacity: '0.8' },
+        };
+        const appearance: Appearance = { variables, rules, colorScheme: 'auto' };
+        expect(appearance).toBeDefined();
+        expect(appearance.variables).toBe(variables);
+        expect(appearance.rules).toBe(rules);
+        expect(appearance.colorScheme).toBe('auto');
+    });
+
+    it('AppearanceRuleTarget 覆盖 7 个语义锚点', () => {
+        const targets: AppearanceRuleTarget[] = [
+            'input',
+            'input:focus',
+            'input:invalid',
+            'label',
+            'error',
+            'cardBrand',
+            'cvvIcon',
+        ];
+        expect(targets).toHaveLength(7);
+    });
+
+    it('AppearanceRuleStyle 为属性名到值的开放映射', () => {
+        const style: AppearanceRuleStyle = { color: '#000', 'border-radius': '4px' };
+        expect(style.color).toBe('#000');
+    });
+
+    it('非白名单 rule target 应被类型层拒绝', () => {
+        const appearance: Appearance = {
+            // @ts-expect-error body 不是合法的 AppearanceRuleTarget
+            rules: { body: {} },
+        };
+        expect(appearance).toBeDefined();
     });
 });

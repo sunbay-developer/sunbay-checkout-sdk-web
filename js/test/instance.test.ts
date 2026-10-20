@@ -249,6 +249,60 @@ describe('CheckoutInstance colorScheme 透传', () => {
     });
 });
 
+describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', () => {
+    /** 从 iframe src 的 query 解出 appearance 参数并 JSON 解码。 */
+    function parseAppearanceParam(src: string): unknown {
+        const q = src.indexOf('?');
+        const params = new URLSearchParams(q >= 0 ? src.slice(q) : '');
+        const raw = params.get('appearance');
+        return raw === null ? undefined : JSON.parse(raw);
+    }
+
+    it('带 variables + rules 的 createCheckout 后，element iframe src 含 &appearance= 且解码后含该 variables/rules', async () => {
+        const appearance: Appearance = {
+            variables: { colorPrimary: '#ff6000', borderRadius: '8px' },
+            rules: { input: { 'font-weight': 'bold' } },
+            colorScheme: 'dark',
+        };
+        const { instance } = await bootstrap(undefined, { appearance });
+        const element = instance.create('card');
+        const container = document.createElement('div');
+        container.id = 'ap-instance-target';
+        document.body.appendChild(container);
+
+        void element.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('&appearance=');
+        // colorScheme 仍单独透传（不回退）。
+        expect(src).toContain('colorScheme=dark');
+
+        const decoded = parseAppearanceParam(src);
+        expect(decoded).toMatchObject({
+            variables: { colorPrimary: '#ff6000', borderRadius: '8px' },
+            rules: { input: { 'font-weight': 'bold' } },
+        });
+
+        document.body.innerHTML = '';
+    });
+
+    it('appearance 仅含 colorScheme（无 variables/rules）时不拼接 &appearance=（避免空串）', async () => {
+        const { instance } = await bootstrap(undefined, {
+            appearance: { colorScheme: 'light' },
+        });
+        const element = instance.create('card');
+        const container = document.createElement('div');
+        container.id = 'ap-instance-empty';
+        document.body.appendChild(container);
+
+        void element.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('appearance=');
+        expect(src).toContain('colorScheme=light');
+
+        document.body.innerHTML = '';
+    });
+});
+
 describe('CheckoutInstance.confirm', () => {
     it('在 paymentResult 事件到达后以 PaymentOutcome resolve', async () => {
         const { instance, transport } = await bootstrap();

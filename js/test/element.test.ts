@@ -73,7 +73,8 @@ function makeElement(
     transport: MockTransport,
     type: ElementType,
     elementId = 'el_1',
-    colorScheme?: 'light' | 'dark' | 'auto'
+    colorScheme?: 'light' | 'dark' | 'auto',
+    appearance?: import('@sunbay/checkout-sdk-protocol').Appearance
 ): CheckoutElement {
     return new CheckoutElement({
         elementId,
@@ -82,6 +83,7 @@ function makeElement(
         checkoutId: CHECKOUT_ID,
         transport,
         colorScheme,
+        appearance,
     });
 }
 
@@ -225,6 +227,57 @@ describe('CheckoutElement colorScheme 透传 iframe src', () => {
         void el.mount(container);
         const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
         expect(src).not.toContain('colorScheme');
+    });
+});
+
+describe('CheckoutElement appearance 透传 iframe src', () => {
+    it('提供含 variables 的 appearance 时 iframe src 带 &appearance=（解码含该 variables）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_ap', undefined, {
+            variables: { colorPrimary: '#ff6000' },
+        });
+        const container = makeContainer('t-ap-vars');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('&appearance=');
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        const decoded = JSON.parse(params.get('appearance') ?? 'null');
+        expect(decoded).toMatchObject({ variables: { colorPrimary: '#ff6000' } });
+    });
+
+    it('提供含 rules 的 appearance 时 iframe src 带 &appearance=（解码含该 rules）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_ap2', undefined, {
+            rules: { input: { 'font-weight': 'bold' } },
+        });
+        const container = makeContainer('t-ap-rules');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('&appearance=');
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        const decoded = JSON.parse(params.get('appearance') ?? 'null');
+        expect(decoded).toMatchObject({ rules: { input: { 'font-weight': 'bold' } } });
+    });
+
+    it('appearance 仅含 colorScheme（无 variables/rules）时不拼接 appearance=（避免空串）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_ap3', 'dark', {
+            colorScheme: 'dark',
+        });
+        const container = makeContainer('t-ap-empty');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('appearance=');
+        expect(src).toContain('colorScheme=dark');
+    });
+
+    it('未提供 appearance 时 iframe src 不含 appearance 参数', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_ap4');
+        const container = makeContainer('t-ap-none');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('appearance=');
     });
 });
 
