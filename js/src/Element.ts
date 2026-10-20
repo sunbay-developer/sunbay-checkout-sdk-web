@@ -14,6 +14,7 @@
 
 import {
     ErrorCode,
+    isIframeResizeMessage,
     type AvailableWallets,
     type CheckoutError,
     type CommandName,
@@ -144,6 +145,14 @@ export class CheckoutElement {
     /** 仅 expressCheckout：常驻订阅的 expressAvailabilityChange handler（destroy 时解绑）。 */
     private availabilityHandler: ((payload: unknown) => void) | null = null;
 
+    /**
+     * iframe 自适应高度：挂载期间常驻的 window 'message' 监听器（iframe 消失/销毁时解绑）。
+     * 存引用以便 removeEventListener；null 表示未监听。
+     */
+    private resizeHandler: ((e: MessageEvent) => void) | null = null;
+    /** 最近一次已应用的 iframe 高度（px），用于去重，避免冗余 style 写入；null 表示尚未设置。 */
+    private lastHeight: number | null = null;
+
     constructor(opts: CheckoutElementOptions) {
         this.elementId = opts.elementId;
         this.type = opts.type;
@@ -222,6 +231,7 @@ export class CheckoutElement {
         iframe.style.display = 'block';
         container.appendChild(iframe);
         this.iframe = iframe;
+        this.installResizeListener();
 
         return new Promise<void>((resolve, reject) => {
             const cleanup = (): void => {
@@ -441,20 +451,71 @@ export class CheckoutElement {
     }
 
     /**
-     * 解析 iframe src：拆分字段走 /sdk/field/，其余走 /sdk/element/，带 checkoutId；
+     * 解析 iframe src：拆分字段走 /sdk/field/，其余走 /sdk/element/，带 checkoutId 与 elementId；
      * 若提供了初始 colorScheme，则追加 `&colorScheme=<值>`（首帧无闪）。
+     *
+     * elementId 随 src 下发，供托管 child 在 iframe-resize 消息中原样回传，父窗口据此在
+     * 同页多个 iframe 间按句柄分发高度。
      */
     private resolveSrc(): string {
         const segment = FIELD_TYPES.includes(this.type) ? 'field' : 'element';
         let query = `?checkoutId=${encodeURIComponent(this.checkoutId)}`;
+        query += `&elementId=${encodeURIComponent(this.elementId)}`;
         if (this.colorScheme) {
             query += `&colorScheme=${encodeURIComponent(this.colorScheme)}`;
         }
         return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
     }
 
-    /** 移除 iframe DOM 节点（若存在）。 */
+    /**
+     * 安装 iframe 自适应高度监听：订阅 window 'message'，仅采信来自本 iframe
+     * `contentWindow` 且 origin === hostOrigin 的合法 {@link IframeResizeMessage}，
+     * 且 elementId 与本句柄匹配时，将外层 iframe 高度调整为内容真实高度（宽度保持 100%）。
+     *
+     * 安全：先校验 `event.source === iframe.contentWindow`（关键来源校验），
+     * 再校验 `event.origin === hostOrigin`（更严格的同源校验），防跨源伪造。
+     * 高度去重：与上次相同则跳过，避免冗余 style 写入。
+     */
+    private installResizeListener(): void {
+        const handler = (event: MessageEvent): void => {
+            if (!this.iframe) {
+                return;
+            }
+            if (event.source !== this.iframe.contentWindow) {
+                return;
+            }
+            if (event.origin !== this.hostOrigin) {
+                return;
+            }
+            if (!isIframeResizeMessage(event.data)) {
+                return;
+            }
+            if (event.data.elementId !== this.elementId) {
+                return;
+            }
+            const { height } = event.data;
+            if (height === this.lastHeight) {
+                return;
+            }
+            this.lastHeight = height;
+            this.iframe.style.height = `${height}px`;
+        };
+        this.resizeHandler = handler;
+        window.addEventListener('message', handler);
+    }
+
+    /** 解绑 iframe 自适应高度监听并重置去重状态（幂等）。 */
+    private teardownResizeListener(): void {
+        if (this.resizeHandler) {
+            window.removeEventListener('message', this.resizeHandler);
+            this.resizeHandler = null;
+        }
+        this.lastHeight = null;
+    }
+
+    /** 移除 iframe DOM 节点（若存在），并解绑自适应高度监听。 */
     private removeIframe(): void {
+        this.teardownResizeListener();
         if (this.iframe && this.iframe.parentNode) {
             this.iframe.parentNode.removeChild(this.iframe);
         }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CheckoutElement } from '../src/Element';
 import {
     ErrorCode,
+    IFRAME_RESIZE_MESSAGE_TYPE,
     type AvailableWallets,
     type CommandName,
     type ElementType,
@@ -451,5 +452,187 @@ describe('CheckoutElement expressCheckout', () => {
 
         expect(results).toHaveLength(1);
         expect(results[0]).toEqual(evt);
+    });
+});
+
+describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
+    /**
+     * 为 jsdom iframe 固定一个 contentWindow 哨兵对象，并返回它。
+     * jsdom 的 iframe.contentWindow 可能为空/不稳定，用 defineProperty 固定为可控哨兵，
+     * 以便用 new MessageEvent({ source }) 精确匹配/错配来源。
+     */
+    function fixContentWindow(iframe: HTMLIFrameElement): Window {
+        const sentinel = {} as Window;
+        Object.defineProperty(iframe, 'contentWindow', {
+            configurable: true,
+            get: () => sentinel,
+        });
+        return sentinel;
+    }
+
+    /** 构造一条 resize 消息事件（可覆写 source/origin/data）。 */
+    function resizeEvent(opts: {
+        source: Window | null;
+        origin: string;
+        data: unknown;
+    }): MessageEvent {
+        return new MessageEvent('message', {
+            data: opts.data,
+            origin: opts.origin,
+            source: opts.source,
+        });
+    }
+
+    /** 合法 resize 载荷。 */
+    function resizeData(elementId: string, height: number): unknown {
+        return { type: IFRAME_RESIZE_MESSAGE_TYPE, elementId, height };
+    }
+
+    it('iframe src 携带 elementId 参数（供 child 原样回传）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz_src');
+        const container = makeContainer('t-rsz-src');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('elementId=el_rsz_src');
+    });
+
+    it('合法消息（source=contentWindow、origin=hostOrigin、elementId 匹配）设置 iframe.style.height', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-ok');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 321) })
+        );
+        expect(iframe.style.height).toBe('321px');
+    });
+
+    it('来源错误（source 非本 iframe.contentWindow）被忽略', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-badsrc');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        fixContentWindow(iframe);
+
+        const otherWindow = {} as Window;
+        window.dispatchEvent(
+            resizeEvent({
+                source: otherWindow,
+                origin: HOST_ORIGIN,
+                data: resizeData('el_rsz', 500),
+            })
+        );
+        expect(iframe.style.height).toBe('');
+    });
+
+    it('origin 错误被忽略', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-badorigin');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        window.dispatchEvent(
+            resizeEvent({
+                source: cw,
+                origin: 'https://evil.example.com',
+                data: resizeData('el_rsz', 500),
+            })
+        );
+        expect(iframe.style.height).toBe('');
+    });
+
+    it('elementId 不匹配被忽略', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-badid');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        window.dispatchEvent(
+            resizeEvent({
+                source: cw,
+                origin: HOST_ORIGIN,
+                data: resizeData('el_other', 500),
+            })
+        );
+        expect(iframe.style.height).toBe('');
+    });
+
+    it('畸形消息（非 resize 结构）被忽略', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-malformed');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        // 缺字段 / 类型错误 / 完全无关
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: { type: 'other', height: 400 } })
+        );
+        window.dispatchEvent(
+            resizeEvent({
+                source: cw,
+                origin: HOST_ORIGIN,
+                data: { type: IFRAME_RESIZE_MESSAGE_TYPE, elementId: 'el_rsz' },
+            })
+        );
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: 'not-an-object' })
+        );
+        expect(iframe.style.height).toBe('');
+    });
+
+    it('相同高度去重（最终值稳定）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-dedupe');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 200) })
+        );
+        expect(iframe.style.height).toBe('200px');
+        // 再发相同高度：去重，不改变最终值
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 200) })
+        );
+        expect(iframe.style.height).toBe('200px');
+        // 发不同高度：更新
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 260) })
+        );
+        expect(iframe.style.height).toBe('260px');
+    });
+
+    it('destroy 后监听器移除：后续合法消息不再改变高度', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_rsz');
+        const container = makeContainer('t-rsz-destroy');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const cw = fixContentWindow(iframe);
+
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 150) })
+        );
+        expect(iframe.style.height).toBe('150px');
+
+        el.destroy();
+        // destroy 后 iframe 已移除；即便复用旧引用再派发合法消息，也不应改变其 height
+        window.dispatchEvent(
+            resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 999) })
+        );
+        expect(iframe.style.height).toBe('150px');
     });
 });
