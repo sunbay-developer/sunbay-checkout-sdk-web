@@ -85,3 +85,9 @@ export {
     type ElementStatus,
     type PaymentAction,
 } from './types';
+
+export {
+    IFRAME_RESIZE_MESSAGE_TYPE,
+    isIframeResizeMessage,
+    type IframeResizeMessage,
+} from './iframeLayout';

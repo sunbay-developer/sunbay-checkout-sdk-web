@@ -286,3 +286,46 @@ describe('protocol express availability event registration', () => {
         expect(payload.availableWallets?.googlePay).toBe(true);
     });
 });
+
+import {
+    IFRAME_RESIZE_MESSAGE_TYPE,
+    isIframeResizeMessage,
+    type IframeResizeMessage,
+} from '@sunbay/checkout-sdk-protocol';
+
+describe('isIframeResizeMessage (iframe auto-resize contract)', () => {
+    const valid: IframeResizeMessage = {
+        type: IFRAME_RESIZE_MESSAGE_TYPE,
+        elementId: 'el_1',
+        height: 42,
+    };
+
+    it('接受合法消息(type/elementId/height 齐备)', () => {
+        expect(isIframeResizeMessage(valid)).toBe(true);
+    });
+
+    it('接受 height=0(边界,非负有限)', () => {
+        expect(isIframeResizeMessage({ ...valid, height: 0 })).toBe(true);
+    });
+
+    it('拒绝 type 不匹配', () => {
+        expect(isIframeResizeMessage({ ...valid, type: 'other' })).toBe(false);
+    });
+
+    it('拒绝 elementId 空串 / 非字符串', () => {
+        expect(isIframeResizeMessage({ ...valid, elementId: '' })).toBe(false);
+        expect(isIframeResizeMessage({ ...valid, elementId: 123 })).toBe(false);
+    });
+
+    it('拒绝 height 非有限 / 负数 / 非数字', () => {
+        expect(isIframeResizeMessage({ ...valid, height: Infinity })).toBe(false);
+        expect(isIframeResizeMessage({ ...valid, height: -1 })).toBe(false);
+        expect(isIframeResizeMessage({ ...valid, height: '42' })).toBe(false);
+    });
+
+    it('拒绝非对象 / null', () => {
+        expect(isIframeResizeMessage(null)).toBe(false);
+        expect(isIframeResizeMessage('x')).toBe(false);
+        expect(isIframeResizeMessage(undefined)).toBe(false);
+    });
+});
