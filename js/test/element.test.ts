@@ -74,7 +74,8 @@ function makeElement(
     type: ElementType,
     elementId = 'el_1',
     colorScheme?: 'light' | 'dark' | 'auto',
-    appearance?: import('@sunbay/checkout-sdk-protocol').Appearance
+    appearance?: import('@sunbay/checkout-sdk-protocol').Appearance,
+    initialOptions?: import('@sunbay/checkout-sdk-protocol').ElementOptions
 ): CheckoutElement {
     return new CheckoutElement({
         elementId,
@@ -84,6 +85,7 @@ function makeElement(
         transport,
         colorScheme,
         appearance,
+        initialOptions,
     });
 }
 
@@ -278,6 +280,85 @@ describe('CheckoutElement appearance 透传 iframe src', () => {
         void el.mount(container);
         const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
         expect(src).not.toContain('appearance=');
+    });
+});
+
+describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
+    it('buttonHeight 拼进 &buttonHeight=<n>', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_bh', undefined, undefined, {
+            buttonHeight: 52,
+        });
+        const container = makeContainer('t-express-bh');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        expect(params.get('buttonHeight')).toBe('52');
+    });
+
+    it('applePay 对象形态的 buttonType 拼进 &applePayButtonType=<v>', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_abt', undefined, undefined, {
+            paymentMethods: { applePay: { buttonType: 'buy' } },
+        });
+        const container = makeContainer('t-express-abt');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        expect(params.get('applePayButtonType')).toBe('buy');
+    });
+
+    it('googlePay 对象形态的 buttonType 拼进 &googlePayButtonType=<v>', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_gbt', undefined, undefined, {
+            paymentMethods: { googlePay: { buttonType: 'checkout' } },
+        });
+        const container = makeContainer('t-express-gbt');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        expect(params.get('googlePayButtonType')).toBe('checkout');
+    });
+
+    it('钱包为布尔开关(无对象)时不拼 buttonType 参数', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_bool', undefined, undefined, {
+            paymentMethods: { applePay: false, googlePay: true },
+        });
+        const container = makeContainer('t-express-bool');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('applePayButtonType');
+        expect(src).not.toContain('googlePayButtonType');
+    });
+
+    it('无 express options 时不拼 buttonHeight / buttonType 参数', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_none');
+        const container = makeContainer('t-express-opts-none');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).not.toContain('buttonHeight');
+        expect(src).not.toContain('ButtonType');
+    });
+
+    it('不破坏现有钱包开关 query（applePay/googlePay 开关语义保持，对象形态不拼布尔开关串）', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_mix', undefined, undefined, {
+            paymentMethods: {
+                applePay: { buttonType: 'donate' },
+                googlePay: false,
+            },
+            buttonHeight: 30,
+        });
+        const container = makeContainer('t-express-mix');
+        void el.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        const params = new URLSearchParams(src.slice(src.indexOf('?')));
+        expect(params.get('applePayButtonType')).toBe('donate');
+        expect(params.get('buttonHeight')).toBe('30');
+        // 显式关闭的钱包仍以布尔开关下发
+        expect(params.get('googlePay')).toBe('false');
     });
 });
 
