@@ -29,8 +29,27 @@
       ============================================================================
     -->
         <style>
+            /*
+             * 商户页自身的配色变量。模拟「真实商户站点」会随自己选择的主题切换
+             * 页面背景 / 文字 / 控件。:root = 浅色默认;html[data-demo='dark'] 覆盖为深色。
+             * 本页 JS 会把所选 colorScheme(light/dark，auto 跟随系统)应用到 <html data-demo>，
+             * 使 SDK iframe(卡字段)与商户页外观一致,避免深色 iframe 嵌在白底页上的割裂感。
+             */
             :root {
-                color-scheme: light dark;
+                color-scheme: light;
+                --demo-bg: #ffffff;
+                --demo-fg: #1a1a1a;
+                --demo-muted: #6b7280;
+                --demo-border: #cccccc;
+                --demo-surface: #f3f4f6;
+            }
+            html[data-demo='dark'] {
+                color-scheme: dark;
+                --demo-bg: #09090b;
+                --demo-fg: #e6e6e6;
+                --demo-muted: #a1a1aa;
+                --demo-border: #27272a;
+                --demo-surface: #18181b;
             }
             body {
                 font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -38,33 +57,44 @@
                 margin: 40px auto;
                 padding: 0 16px;
                 line-height: 1.5;
+                background: var(--demo-bg);
+                color: var(--demo-fg);
+                transition:
+                    background-color 0.2s ease,
+                    color 0.2s ease;
             }
             h1 {
                 font-size: 20px;
+                color: var(--demo-fg);
             }
             label {
                 display: block;
                 font-size: 13px;
                 font-weight: 600;
                 margin: 16px 0 6px;
+                color: var(--demo-fg);
             }
             input[type='text'] {
                 width: 100%;
                 box-sizing: border-box;
                 padding: 8px 10px;
                 font-size: 14px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--demo-border);
                 border-radius: 6px;
+                background: var(--demo-bg);
+                color: var(--demo-fg);
             }
             select {
                 padding: 8px 10px;
                 font-size: 14px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--demo-border);
                 border-radius: 6px;
+                background: var(--demo-bg);
+                color: var(--demo-fg);
             }
             .field {
                 min-height: 42px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--demo-border);
                 border-radius: 6px;
                 padding: 2px;
             }
@@ -104,7 +134,8 @@
                 margin-top: 20px;
                 padding: 12px;
                 border-radius: 6px;
-                background: #f3f4f6;
+                background: var(--demo-surface);
+                color: var(--demo-fg);
                 white-space: pre-wrap;
                 font-family: ui-monospace, monospace;
                 font-size: 13px;
@@ -112,7 +143,7 @@
             }
             .hint {
                 font-size: 12px;
-                color: #6b7280;
+                color: var(--demo-muted);
             }
         </style>
     </head>
@@ -191,6 +222,32 @@
                     });
                 }
 
+                /**
+                 * 把所选 colorScheme 应用到「商户页自身」(<html data-demo>)。
+                 * 模拟真实商户站点会随自己的主题切换页面外观，使商户页与 SDK iframe 一致。
+                 * - 'light' / 'dark' → 强制设定 data-demo;
+                 * - 'auto' → 跟随系统 prefers-color-scheme。
+                 * 注意：这只影响商户页自身，SDK iframe 的配色仍由 appearance.colorScheme 控制。
+                 */
+                function applyMerchantPageScheme(scheme) {
+                    let effective = scheme;
+                    if (scheme === 'auto') {
+                        effective =
+                            window.matchMedia &&
+                            window.matchMedia('(prefers-color-scheme: dark)').matches
+                                ? 'dark'
+                                : 'light';
+                    }
+                    document.documentElement.setAttribute('data-demo', effective);
+                }
+
+                // 页面载入即按「初始配色」下拉框应用一次，并在下拉变化时同步商户页外观，
+                // 让用户在初始化前就能预览商户页深浅色效果。
+                applyMerchantPageScheme(initSchemeSelect.value);
+                initSchemeSelect.addEventListener('change', function () {
+                    applyMerchantPageScheme(initSchemeSelect.value);
+                });
+
                 /** 持有已就绪的 CheckoutInstance。 */
                 let checkout = null;
 
@@ -222,6 +279,8 @@
                     }
                     initBtn.disabled = true;
                     const initScheme = initSchemeSelect.value;
+                    // 商户页自身也切到初始配色，和 SDK iframe 外观保持一致。
+                    applyMerchantPageScheme(initScheme);
                     show('① 正在准备会话…（初始配色=' + initScheme + '）');
 
                     try {
@@ -273,6 +332,8 @@
                         }
                         const scheme = btn.getAttribute('data-scheme');
                         setSwitcherEnabled(false);
+                        // 商户页自身也随之切换，模拟真实商户随主题切换整页外观。
+                        applyMerchantPageScheme(scheme);
                         show('运行时切换配色 → ' + scheme + '（updateCheckout）…');
                         try {
                             await checkout.updateCheckout({
