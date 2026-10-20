@@ -84,6 +84,8 @@ export {
     type AddressElementOptions,
     type ApplePayButtonTheme,
     type GooglePayButtonTheme,
+    type ApplePayButtonType,
+    type GooglePayButtonType,
     type ApplePayOptions,
     type GooglePayOptions,
     type ExpressCheckoutElementOptions,

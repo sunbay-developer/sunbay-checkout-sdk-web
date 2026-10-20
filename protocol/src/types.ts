@@ -225,16 +225,48 @@ export type ApplePayButtonTheme = 'black' | 'white' | 'white-outline';
 /** Google Pay 官方按钮主题。缺省跟随当前配色（浅 black / 深 white）。 */
 export type GooglePayButtonTheme = 'black' | 'white' | 'default';
 
+/** Apple Pay 官方按钮文案类型（`apple-pay-button` 的 `type` 属性，官方全集）。 */
+export type ApplePayButtonType =
+    | 'plain'
+    | 'buy'
+    | 'donate'
+    | 'check-out'
+    | 'book'
+    | 'subscribe'
+    | 'reload'
+    | 'add-money'
+    | 'top-up'
+    | 'order'
+    | 'rent'
+    | 'support'
+    | 'contribute'
+    | 'tip';
+
+/** Google Pay 官方按钮文案类型（`buttonType`，官方全集）。 */
+export type GooglePayButtonType =
+    | 'buy'
+    | 'plain'
+    | 'checkout'
+    | 'pay'
+    | 'donate'
+    | 'book'
+    | 'order'
+    | 'subscribe';
+
 /** Apple Pay 单钱包配置（显示时的细粒度选项）。 */
 export interface ApplePayOptions {
     /** 按钮主题；缺省跟随当前配色。 */
     buttonTheme?: ApplePayButtonTheme;
+    /** 按钮文案类型；缺省 `'pay'`。 */
+    buttonType?: ApplePayButtonType;
 }
 
 /** Google Pay 单钱包配置（显示时的细粒度选项）。 */
 export interface GooglePayOptions {
     /** 按钮主题；缺省跟随当前配色。 */
     buttonTheme?: GooglePayButtonTheme;
+    /** 按钮文案类型；缺省 `'pay'`。 */
+    buttonType?: GooglePayButtonType;
 }
 
 /** expressCheckout Element 配置（spec 6）。 */
@@ -253,7 +285,7 @@ export interface ExpressCheckoutElementOptions {
     layout?: {
         maxColumns?: number;
     };
-    /** 按钮高度（像素）。 */
+    /** 钱包按钮高度（像素，全局应用到所有钱包按钮）。hosted 侧 clamp 到 [30, 64]；缺省 40。 */
     buttonHeight?: number;
 }
 

@@ -427,3 +427,90 @@ describe('protocol appearance variables + rules', () => {
         expect(appearance).toBeDefined();
     });
 });
+
+/**
+ * expressCheckout 钱包按钮 buttonType + buttonHeight 契约（Task 1）。
+ * 覆盖：ApplePayButtonType（14 项官方全集）/ GooglePayButtonType（8 项）为白名单联合字面量；
+ * ApplePayOptions/GooglePayOptions.buttonType 可赋合法值、非法值被类型层拒；
+ * ExpressCheckoutElementOptions.buttonHeight 与每钱包 buttonType 组合可往返。
+ */
+import type {
+    ApplePayButtonType,
+    GooglePayButtonType,
+} from '@sunbay/checkout-sdk-protocol';
+
+describe('protocol expressCheckout buttonType + buttonHeight', () => {
+    it('ApplePayButtonType 接受 14 项官方全集', () => {
+        const types: ApplePayButtonType[] = [
+            'plain',
+            'buy',
+            'donate',
+            'check-out',
+            'book',
+            'subscribe',
+            'reload',
+            'add-money',
+            'top-up',
+            'order',
+            'rent',
+            'support',
+            'contribute',
+            'tip',
+        ];
+        expect(types).toHaveLength(14);
+    });
+
+    it('GooglePayButtonType 接受 8 项官方全集', () => {
+        const types: GooglePayButtonType[] = [
+            'buy',
+            'plain',
+            'checkout',
+            'pay',
+            'donate',
+            'book',
+            'order',
+            'subscribe',
+        ];
+        expect(types).toHaveLength(8);
+    });
+
+    it('每钱包 buttonType + 全局 buttonHeight 组合可赋值并往返相等', () => {
+        const opts: ExpressCheckoutElementOptions = {
+            paymentMethods: {
+                applePay: { buttonType: 'buy' },
+                googlePay: { buttonType: 'checkout' },
+            },
+            buttonHeight: 48,
+        };
+        const decoded = JSON.parse(JSON.stringify(opts)) as ExpressCheckoutElementOptions;
+        expect(decoded).toEqual(opts);
+        expect(decoded.buttonHeight).toBe(48);
+    });
+
+    it('ApplePayOptions/GooglePayOptions 可省略 buttonType（向后兼容）', () => {
+        const apple: ApplePayOptions = {};
+        const google: GooglePayOptions = {};
+        expect(apple.buttonType).toBeUndefined();
+        expect(google.buttonType).toBeUndefined();
+    });
+
+    it('非法 applePay buttonType 应被类型层拒绝', () => {
+        const opts: ExpressCheckoutElementOptions = {
+            paymentMethods: {
+                // @ts-expect-error 'nope' 不是合法的 ApplePayButtonType
+                applePay: { buttonType: 'nope' },
+            },
+        };
+        expect(opts).toBeDefined();
+    });
+
+    it('非法 googlePay buttonType 应被类型层拒绝', () => {
+        const opts: ExpressCheckoutElementOptions = {
+            paymentMethods: {
+                // @ts-expect-error 'pay-now' 不是合法的 GooglePayButtonType
+                googlePay: { buttonType: 'pay-now' },
+            },
+        };
+        expect(opts).toBeDefined();
+    });
+});
