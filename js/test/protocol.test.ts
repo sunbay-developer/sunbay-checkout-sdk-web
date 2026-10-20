@@ -200,7 +200,6 @@ describe('protocol expressCheckout options', () => {
         const opts: ExpressCheckoutElementOptions = {
             paymentMethods: { applePay: true, googlePay: false },
             layout: { maxColumns: 2 },
-            buttonTheme: { applePay: 'black', googlePay: 'white' },
             buttonHeight: 48,
         };
         const wire = JSON.stringify(opts);
@@ -209,7 +208,6 @@ describe('protocol expressCheckout options', () => {
         expect(decoded.paymentMethods?.applePay).toBe(true);
         expect(decoded.paymentMethods?.googlePay).toBe(false);
         expect(decoded.layout?.maxColumns).toBe(2);
-        expect(decoded.buttonTheme?.applePay).toBe('black');
         expect(decoded.buttonHeight).toBe(48);
     });
 
@@ -327,5 +325,57 @@ describe('isIframeResizeMessage (iframe auto-resize contract)', () => {
         expect(isIframeResizeMessage(null)).toBe(false);
         expect(isIframeResizeMessage('x')).toBe(false);
         expect(isIframeResizeMessage(undefined)).toBe(false);
+    });
+});
+
+/**
+ * expressCheckout 每钱包配置契约（钱包按钮主题跟随 Task 1）。
+ * 覆盖：paymentMethods.{applePay,googlePay} 为 `boolean | 对应 Options`；
+ * ApplePayOptions/GooglePayOptions.buttonTheme 为白名单联合字面量；四个新符号已从协议包导出。
+ */
+import type {
+    ApplePayButtonTheme,
+    ApplePayOptions,
+    GooglePayButtonTheme,
+    GooglePayOptions,
+} from '@sunbay/checkout-sdk-protocol';
+
+describe('protocol expressCheckout per-wallet options', () => {
+    it('paymentMethods 接受「布尔 | 配置对象」混合形状', () => {
+        const a: ExpressCheckoutElementOptions = {
+            paymentMethods: { applePay: false, googlePay: { buttonTheme: 'white' } },
+        };
+        const b: ExpressCheckoutElementOptions = {
+            paymentMethods: { applePay: true, googlePay: { buttonTheme: 'default' } },
+        };
+        expect(a).toBeDefined();
+        expect(b).toBeDefined();
+        const decodedA = JSON.parse(JSON.stringify(a)) as ExpressCheckoutElementOptions;
+        const decodedB = JSON.parse(JSON.stringify(b)) as ExpressCheckoutElementOptions;
+        expect(decodedA).toEqual(a);
+        expect(decodedB).toEqual(b);
+    });
+
+    it('ApplePayButtonTheme 接受 black | white | white-outline', () => {
+        const themes: ApplePayButtonTheme[] = ['black', 'white', 'white-outline'];
+        for (const buttonTheme of themes) {
+            const opts: ApplePayOptions = { buttonTheme };
+            expect(opts.buttonTheme).toBe(buttonTheme);
+        }
+    });
+
+    it('GooglePayButtonTheme 接受 black | white | default', () => {
+        const themes: GooglePayButtonTheme[] = ['black', 'white', 'default'];
+        for (const buttonTheme of themes) {
+            const opts: GooglePayOptions = { buttonTheme };
+            expect(opts.buttonTheme).toBe(buttonTheme);
+        }
+    });
+
+    it('ApplePayOptions/GooglePayOptions 可省略 buttonTheme', () => {
+        const apple: ApplePayOptions = {};
+        const google: GooglePayOptions = {};
+        expect(apple.buttonTheme).toBeUndefined();
+        expect(google.buttonTheme).toBeUndefined();
     });
 });
