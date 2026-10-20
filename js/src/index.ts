@@ -63,5 +63,11 @@ if (typeof window !== 'undefined') {
     w.SunbayCheckout = { ...(w.SunbayCheckout ?? {}), createCheckout };
 }
 
-/** 包版本（占位，随发布流程注入）。 */
-export const version = '0.0.0';
+/**
+ * 包版本。构建期由 tsup 的 `define` 从 `package.json` 注入 `__SDK_VERSION__`
+ * （见 tsup.config.ts），使代码版本号永远与 package.json 同步。未经构建的环境
+ * （如 vitest 直接跑 src）无此 define，回退到 `'0.0.0'`。
+ */
+declare const __SDK_VERSION__: string;
+export const version: string =
+    typeof __SDK_VERSION__ !== 'undefined' ? __SDK_VERSION__ : '0.0.0';
