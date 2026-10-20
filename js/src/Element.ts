@@ -15,6 +15,7 @@
 import {
     ErrorCode,
     isIframeResizeMessage,
+    type Appearance,
     type AvailableWallets,
     type CheckoutError,
     type CommandName,
@@ -61,6 +62,14 @@ export interface CheckoutElementOptions {
      * updateCheckout 命令，不走此处。
      */
     colorScheme?: 'light' | 'dark' | 'auto';
+    /**
+     * 初始外观定制（来自 createCheckout 的 appearance）。
+     * 仅当含 `variables` 或 `rules` 时序列化进 iframe src 的
+     * `&appearance=<encodeURIComponent(JSON)>`，使托管 iframe 在首帧即按该外观渲染（无闪）。
+     * 仅含 `colorScheme`（无 variables/rules）时不拼接，避免空外观字符串；colorScheme 走独立
+     * `&colorScheme=`。运行时切换走 updateCheckout 命令，不走此处。
+     */
+    appearance?: Appearance;
 }
 
 /** 事件 payload 的公共结构（含 elementId，用于按自身句柄过滤）。 */
@@ -128,6 +137,8 @@ export class CheckoutElement {
     private options: ElementOptions | undefined;
     /** 初始配色方案（拼进 iframe src；缺省不拼）。 */
     private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
+    /** 初始外观定制（含 variables/rules 时拼进 iframe src；缺省或仅 colorScheme 不拼）。 */
+    private readonly appearance: Appearance | undefined;
 
     private status: ElementStatus = 'created';
     private container: HTMLElement | null = null;
@@ -161,6 +172,7 @@ export class CheckoutElement {
         this.transport = opts.transport;
         this.options = opts.initialOptions;
         this.colorScheme = opts.colorScheme;
+        this.appearance = opts.appearance;
         this.installInputActions();
         this.installExpressAvailability();
     }
@@ -452,7 +464,10 @@ export class CheckoutElement {
 
     /**
      * 解析 iframe src：拆分字段走 /sdk/field/，其余走 /sdk/element/，带 checkoutId 与 elementId；
-     * 若提供了初始 colorScheme，则追加 `&colorScheme=<值>`（首帧无闪）。
+     * 若提供了初始 colorScheme，则追加 `&colorScheme=<值>`（首帧无闪）；
+     * 若初始 appearance 含 variables 或 rules，则追加
+     * `&appearance=<encodeURIComponent(JSON.stringify(appearance))>`（首帧即生效，无闪）。
+     * 仅含 colorScheme（无 variables/rules）的 appearance 不拼接，避免空外观串。
      *
      * elementId 随 src 下发，供托管 child 在 iframe-resize 消息中原样回传，父窗口据此在
      * 同页多个 iframe 间按句柄分发高度。
@@ -463,6 +478,10 @@ export class CheckoutElement {
         query += `&elementId=${encodeURIComponent(this.elementId)}`;
         if (this.colorScheme) {
             query += `&colorScheme=${encodeURIComponent(this.colorScheme)}`;
+        }
+        // 仅当 appearance 含 variables 或 rules 时序列化（避免空外观串；colorScheme 已单独透传）。
+        if (this.appearance && (this.appearance.variables || this.appearance.rules)) {
+            query += `&appearance=${encodeURIComponent(JSON.stringify(this.appearance))}`;
         }
         return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
     }
