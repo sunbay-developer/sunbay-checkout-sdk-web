@@ -19,6 +19,15 @@ merchant embeds payments with the Checkout JS SDK on **their own site**
   runtime via `updateCheckout({ appearance: { colorScheme } })` and watch the
   card-field iframes re-theme live. SDK iframes default to **light** and only
   follow the system preference when `colorScheme` is `auto`.
+- `customization-playground.html` — a single page to validate **all theming
+  customization** on a real device: `colorScheme`, `appearance.variables`
+  (colorPrimary / colorBackground / colorText / colorBorder / colorDanger /
+  borderRadius / fontFamily), `appearance.rules` (scoped overrides targeting
+  `data-sunbay-el` anchors), and wallet buttons (`expressCheckout` options:
+  per-wallet `buttonTheme` / `buttonType` + global `buttonHeight`). Edit the
+  control panel, click "应用定制" to `updateCheckout` appearance live, or "应用
+  钱包按钮" to rebuild the express Element with new wallet options. Open at
+  `http://localhost:8080/examples/customization-playground.html`.
 
 > Why not validate this inside the checkout project: the checkout hosted page
 > and a real merchant page are **not same-origin**. Only a standalone-origin
