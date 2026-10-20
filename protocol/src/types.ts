@@ -113,6 +113,16 @@ export interface CheckoutError {
 export interface Appearance {
     theme?: string;
     variables?: Record<string, string>;
+    /**
+     * 配色方案偏好。
+     * - `'light'`：浅色；
+     * - `'dark'`：深色；
+     * - `'auto'`：跟随系统 / 宿主环境。
+     *
+     * 协议层只定义类型；缺省时的默认语义（SDK 默认 `'light'`）由消费方实现，
+     * 协议不强制默认值。向后兼容的可选新增字段。
+     */
+    colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 /**

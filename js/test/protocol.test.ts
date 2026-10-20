@@ -152,6 +152,7 @@ describe('protocol error codes', () => {
  */
 import { EVENT_NAMES, isEventName } from '@sunbay/checkout-sdk-protocol';
 import type {
+    Appearance,
     AvailableWallets,
     EventName,
     EventPayloadMap,
@@ -159,6 +160,40 @@ import type {
     ExpressCheckoutElementOptions,
     ElementReadyEvent,
 } from '@sunbay/checkout-sdk-protocol';
+
+/**
+ * Appearance.colorScheme 协议契约测试（真源：protocol/src）。
+ * 覆盖：带 colorScheme:'dark' 的 Appearance 类型检查通过且 JSON 往返保留 colorScheme；
+ * 'light' | 'dark' | 'auto' 三值合法；colorScheme 可省略（向后兼容）。
+ */
+describe('protocol Appearance colorScheme', () => {
+    it("带 colorScheme:'dark' 的 Appearance 类型检查通过且 JSON 往返保留 colorScheme", () => {
+        const appearance: Appearance = {
+            theme: 'default',
+            variables: { '--brand': '#000' },
+            colorScheme: 'dark',
+        };
+        const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
+        expect(decoded).toEqual(appearance);
+        expect(decoded.colorScheme).toBe('dark');
+    });
+
+    it("colorScheme 接受 'light' | 'dark' | 'auto' 三值", () => {
+        const schemes = ['light', 'dark', 'auto'] as const;
+        for (const scheme of schemes) {
+            const appearance: Appearance = { colorScheme: scheme };
+            const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
+            expect(decoded.colorScheme).toBe(scheme);
+        }
+    });
+
+    it('colorScheme 可省略（向后兼容）', () => {
+        const appearance: Appearance = { theme: 'default' };
+        const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
+        expect(decoded).toEqual(appearance);
+        expect(decoded.colorScheme).toBeUndefined();
+    });
+});
 
 describe('protocol expressCheckout options', () => {
     it('ExpressCheckoutElementOptions 精确结构可编解码往返相等', () => {
