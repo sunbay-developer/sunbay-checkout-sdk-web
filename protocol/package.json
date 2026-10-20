@@ -1,6 +1,6 @@
 {
     "name": "@sunbay/checkout-sdk-protocol",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Sunbay Checkout SDK ↔ hosted runtime 通信协议契约（单一真源）。",
     "type": "module",
     "main": "./dist/index.cjs",

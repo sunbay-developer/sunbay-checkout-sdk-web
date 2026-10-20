@@ -24,6 +24,7 @@ import {
     type ElementType,
     type EventName,
     type ExpressAvailabilityChangeEvent,
+    type ExpressCheckoutElementOptions,
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
@@ -468,6 +469,8 @@ export class CheckoutElement {
      * 若初始 appearance 含 variables 或 rules，则追加
      * `&appearance=<encodeURIComponent(JSON.stringify(appearance))>`（首帧即生效，无闪）。
      * 仅含 colorScheme（无 variables/rules）的 appearance 不拼接，避免空外观串。
+     * 对 expressCheckout，另追加钱包开关 / 每钱包 buttonType / 全局 buttonHeight
+     * （见 {@link resolveExpressQuery}）。
      *
      * elementId 随 src 下发，供托管 child 在 iframe-resize 消息中原样回传，父窗口据此在
      * 同页多个 iframe 间按句柄分发高度。
@@ -483,7 +486,53 @@ export class CheckoutElement {
         if (this.appearance && (this.appearance.variables || this.appearance.rules)) {
             query += `&appearance=${encodeURIComponent(JSON.stringify(this.appearance))}`;
         }
+        // expressCheckout：把 create 第二参的 express options（钱包开关 / buttonType /
+        // buttonHeight）透传给托管 iframe，使商户配置在首帧即生效（C1 断链修复）。
+        if (this.type === 'expressCheckout') {
+            query += this.resolveExpressQuery();
+        }
         return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
+    }
+
+    /**
+     * 构造 expressCheckout 专属 query 片段（仅 expressCheckout 调用）：
+     * - 钱包显式置为 `false` → `&applePay=false` / `&googlePay=false`（强制隐藏，保持
+     *   既有开关语义；`true` / 缺省 → 自动，不拼开关）；
+     * - 钱包以对象形态配置且含 `buttonType` → `&applePayButtonType=<v>` /
+     *   `&googlePayButtonType=<v>`（布尔开关 / 缺省 → 不拼）；
+     * - 全局 `buttonHeight`（有限数）→ `&buttonHeight=<n>`。
+     *
+     * 仅在有值时拼接；不拼空串。本片段不触碰卡值，仅承载展示配置。
+     *
+     * @returns 以 `&` 起始的 query 片段（无可拼项时返回空串）。
+     */
+    private resolveExpressQuery(): string {
+        const options = this.options as ExpressCheckoutElementOptions | undefined;
+        if (!options) {
+            return '';
+        }
+        let query = '';
+        const applePay = options.paymentMethods?.applePay;
+        const googlePay = options.paymentMethods?.googlePay;
+        // 钱包开关：仅显式 false（强制隐藏）才下发，保持既有开关语义。
+        if (applePay === false) {
+            query += `&applePay=false`;
+        }
+        if (googlePay === false) {
+            query += `&googlePay=false`;
+        }
+        // 每钱包 buttonType：仅对象形态且含 buttonType 时下发。
+        if (typeof applePay === 'object' && applePay.buttonType) {
+            query += `&applePayButtonType=${encodeURIComponent(applePay.buttonType)}`;
+        }
+        if (typeof googlePay === 'object' && googlePay.buttonType) {
+            query += `&googlePayButtonType=${encodeURIComponent(googlePay.buttonType)}`;
+        }
+        // 全局按钮高度：仅有限数时下发（托管侧再 clamp 到 [30,64]）。
+        if (typeof options.buttonHeight === 'number' && Number.isFinite(options.buttonHeight)) {
+            query += `&buttonHeight=${encodeURIComponent(String(options.buttonHeight))}`;
+        }
+        return query;
     }
 
     /**
