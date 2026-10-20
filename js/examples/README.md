@@ -14,6 +14,11 @@ merchant embeds payments with the Checkout JS SDK on **their own site**
   SDK build, calls `createCheckout`, mounts the **split card fields**
   (cardNumber / cardExpiry / cardCvc) and **expressCheckout** (Apple / Google
   Pay), and triggers `confirm`.
+- `theme-demo.html` — focused **colorScheme (light / dark)** sample: pick the
+  initial `appearance.colorScheme` passed to `createCheckout`, then switch at
+  runtime via `updateCheckout({ appearance: { colorScheme } })` and watch the
+  card-field iframes re-theme live. SDK iframes default to **light** and only
+  follow the system preference when `colorScheme` is `auto`.
 
 > Why not validate this inside the checkout project: the checkout hosted page
 > and a real merchant page are **not same-origin**. Only a standalone-origin
@@ -87,6 +92,9 @@ node server.mjs        # http://localhost:8080
 ```
 
 Open **http://localhost:8080/examples/merchant-demo.html**.
+
+For the colorScheme sample, open
+**http://localhost:8080/examples/theme-demo.html**.
 
 > The demo server port and platform parameters can also be overridden via env:
 > `PORT`, `OPEN_API_URL`, `CURRENCY` (these have safe defaults; the merchant
