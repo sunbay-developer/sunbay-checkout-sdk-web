@@ -113,6 +113,16 @@ export interface CheckoutError {
 export interface Appearance {
     theme?: string;
     variables?: Record<string, string>;
+    /**
+     * 配色方案偏好。
+     * - `'light'`：浅色；
+     * - `'dark'`：深色；
+     * - `'auto'`：跟随系统 / 宿主环境。
+     *
+     * 协议层只定义类型；缺省时的默认语义（SDK 默认 `'light'`）由消费方实现，
+     * 协议不强制默认值。向后兼容的可选新增字段。
+     */
+    colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 /**
@@ -153,25 +163,39 @@ export interface AddressElementOptions {
     appearance?: Appearance;
 }
 
+/** Apple Pay 官方按钮主题。缺省跟随当前配色（浅 black / 深 white）。 */
+export type ApplePayButtonTheme = 'black' | 'white' | 'white-outline';
+
+/** Google Pay 官方按钮主题。缺省跟随当前配色（浅 black / 深 white）。 */
+export type GooglePayButtonTheme = 'black' | 'white' | 'default';
+
+/** Apple Pay 单钱包配置（显示时的细粒度选项）。 */
+export interface ApplePayOptions {
+    /** 按钮主题；缺省跟随当前配色。 */
+    buttonTheme?: ApplePayButtonTheme;
+}
+
+/** Google Pay 单钱包配置（显示时的细粒度选项）。 */
+export interface GooglePayOptions {
+    /** 按钮主题；缺省跟随当前配色。 */
+    buttonTheme?: GooglePayButtonTheme;
+}
+
 /** expressCheckout Element 配置（spec 6）。 */
 export interface ExpressCheckoutElementOptions {
     /**
-     * 各钱包开关（商户显式控制）：
+     * 各钱包开关 / 配置：
      * - `false`：强制隐藏该钱包；
-     * - `true` 或缺省：自动模式，按后端业务允许 ∩ 环境可用展示。
+     * - `true` 或缺省：自动显示（后端业务允许 ∩ 环境可用），主题跟随当前配色；
+     * - 配置对象：自动显示，并应用对象内的细粒度配置（如 buttonTheme）。
      */
     paymentMethods?: {
-        applePay?: boolean;
-        googlePay?: boolean;
+        applePay?: boolean | ApplePayOptions;
+        googlePay?: boolean | GooglePayOptions;
     };
     /** 布局约束（首期仅最大列数）。 */
     layout?: {
         maxColumns?: number;
-    };
-    /** 按钮主题（按钱包区分）。 */
-    buttonTheme?: {
-        applePay?: string;
-        googlePay?: string;
     };
     /** 按钮高度（像素）。 */
     buttonHeight?: number;

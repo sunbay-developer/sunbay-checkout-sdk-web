@@ -79,9 +79,19 @@ export {
     type CardElementOptions,
     type CardFieldElementOptions,
     type AddressElementOptions,
+    type ApplePayButtonTheme,
+    type GooglePayButtonTheme,
+    type ApplePayOptions,
+    type GooglePayOptions,
     type ExpressCheckoutElementOptions,
     type AvailableWallets,
     type ElementOptions,
     type ElementStatus,
     type PaymentAction,
 } from './types';
+
+export {
+    IFRAME_RESIZE_MESSAGE_TYPE,
+    isIframeResizeMessage,
+    type IframeResizeMessage,
+} from './iframeLayout';
