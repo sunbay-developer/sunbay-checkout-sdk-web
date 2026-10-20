@@ -11,7 +11,6 @@ import type {
     PaymentAction,
     PaymentMethod,
     PaymentOutcome,
-    PublicPaymentMethod,
 } from './types';
 
 /** 全部事件名（spec 5.3）。 */
@@ -22,7 +21,6 @@ export type EventName =
     | 'blur'
     | 'loadError'
     | 'elementReady'
-    | 'availablePaymentMethodsChange'
     | 'expressAvailabilityChange'
     | 'paymentStateChange'
     | 'paymentResult'
@@ -36,7 +34,6 @@ export const EVENT_NAMES: readonly EventName[] = [
     'blur',
     'loadError',
     'elementReady',
-    'availablePaymentMethodsChange',
     'expressAvailabilityChange',
     'paymentStateChange',
     'paymentResult',
@@ -77,14 +74,9 @@ export interface LoadErrorEvent {
 }
 
 // --- Express 事件 ---
-export interface AvailablePaymentMethodsChangeEvent {
-    availablePaymentMethods: PublicPaymentMethod[];
-}
-
 /**
  * express 可用钱包变化事件（spec 6）。
- * 专用于 expressCheckout：以 AvailableWallets 表达各钱包可用性，
- * 与 AvailablePaymentMethodsChangeEvent（PublicPaymentMethod[]）并存，互不破坏。
+ * 专用于 expressCheckout：以 AvailableWallets 表达各钱包（Apple/Google Pay）可用性。
  */
 export interface ExpressAvailabilityChangeEvent {
     availableWallets: AvailableWallets;
@@ -117,7 +109,6 @@ export interface EventPayloadMap {
     blur: BlurEvent;
     loadError: LoadErrorEvent;
     elementReady: ElementReadyEvent;
-    availablePaymentMethodsChange: AvailablePaymentMethodsChangeEvent;
     expressAvailabilityChange: ExpressAvailabilityChangeEvent;
     paymentStateChange: PaymentStateChangeEvent;
     paymentResult: PaymentResultEvent;

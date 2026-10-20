@@ -1,55 +1,84 @@
-# AGENTS.md — protocol（@sunbay/checkout-sdk-protocol）
+# AGENTS.md — protocol (@sunbay/checkout-sdk-protocol)
 
-SDK ↔ hosted runtime 通信协议契约的**单一真源**。动手前请先读仓库根 `checkout-sdk-web/AGENTS.md`。
-
----
-
-## 1. 职责与边界
-
-- 定义 SDK（`js`）与 hosted runtime（`checkout/src/sdk-runtime`）之间的信封、命令、事件、错误码与公共类型。
-- **零反向依赖**：protocol 不得依赖 `js` 或 runtime。依赖方向单向。
-- 真源目录 `src/`；两类消费方分别通过 workspace（js）与已发布 npm 包（checkout）消费，**不存在源码副本**。
+The **single source of truth** for the SDK ↔ hosted-runtime protocol contract.
+Read the repo-root `checkout-sdk-web/AGENTS.md` before starting.
 
 ---
 
-## 2. 导出入口（`src/index.ts`）
+## 1. Responsibilities and boundaries
 
-统一出口聚合以下模块，使用者只从包根 `@sunbay/checkout-sdk-protocol` 导入：
-
-- `envelope.ts` — `PROTOCOL_NAME`（`'sunbay-checkout'`）、`PROTOCOL_MAJOR`（当前 `1`）、`encodeEnvelope` / `decodeEnvelope`、`EnvelopeDecodeError`、`Envelope`、`RuntimeHello`。
-- `errors.ts` — `ErrorCode` 及 `ErrorCodeValue`。
-- `commands.ts` — `COMMAND_NAMES` / `isCommandName` 及各命令 Req/Resp 类型（initialize、createElement、updateElement、destroyElement、elementAction、updateCheckout、getSession、getPaymentStatus、confirm、destroy）。
-- `events.ts` — `EVENT_NAMES` / `isEventName` 及各事件 payload 类型（ready、elementReady、change、focus、blur、loadError、availablePaymentMethodsChange、expressAvailabilityChange、paymentStateChange、paymentResult、error）。
-- `types.ts` — 公共领域类型（TxnStatus、AddressInfo、PaymentMethod、PublicSessionView、PaymentOutcome、CheckoutError、Appearance、各 Element options 等）。
-
-> 协议名 `sunbay-checkout`、`major=1` 与 Native Bridge 的 `{v:1,...}` 是**不同协议**，数字相同不代表兼容。
+- Defines the envelope, commands, events, error codes, and public types between
+  the SDK (`js`) and the hosted runtime (`checkout/src/sdk-runtime`).
+- **Zero reverse dependencies**: protocol must not depend on `js` or the
+  runtime. The dependency direction is one-way.
+- Source of truth is `src/`; the two consumer kinds consume it via the workspace
+  (js) and the published npm package (checkout). **No source copies exist.**
 
 ---
 
-## 3. semver 契约纪律
+## 2. Export entry (`src/index.ts`)
 
-- **破坏性变更**（删除/重命名信封字段、命令、事件、错误码，或改变其语义/必填性）→ **升 npm major**，并**同步提升 `PROTOCOL_MAJOR`**；运行时握手会拒绝不兼容的对端。
-- 向后兼容的新增（新命令/事件/可选字段）→ minor。
-- 修订/注释/构建 → patch。
-- **运行时兼容性以握手 `PROTOCOL_MAJOR` 为准**，npm 版本号仅用于依赖管理。
-- `decodeEnvelope` 做最小运行时结构校验（protocol/major/kind/必填字段）；`RuntimeHello`（`kind:'hello'`）握手期尚无 checkoutId，由传输层单独识别，不走 `decodeEnvelope`。
+The single entry aggregates the modules below; consumers import only from the
+package root `@sunbay/checkout-sdk-protocol`:
+
+- `envelope.ts` — `PROTOCOL_NAME` (`'sunbay-checkout'`), `PROTOCOL_MAJOR`
+  (currently `1`), `encodeEnvelope` / `decodeEnvelope`, `EnvelopeDecodeError`,
+  `Envelope`, `RuntimeHello`.
+- `errors.ts` — `ErrorCode` and `ErrorCodeValue`.
+- `commands.ts` — `COMMAND_NAMES` / `isCommandName` and each command's Req/Resp
+  types (initialize, createElement, updateElement, destroyElement,
+  elementAction, updateCheckout, getSession, getPaymentStatus, confirm,
+  destroy).
+- `events.ts` — `EVENT_NAMES` / `isEventName` and each event's payload type
+  (ready, elementReady, change, focus, blur, loadError,
+  expressAvailabilityChange, paymentStateChange, paymentResult, error).
+- `types.ts` — public domain types (TxnStatus, AddressInfo, PaymentMethod,
+  PublicSessionView, PaymentOutcome, CheckoutError, Appearance, each Element's
+  options, etc.).
+
+> The protocol name `sunbay-checkout` and `major=1` are a **different protocol**
+> from the Native Bridge's `{v:1,...}`; the same number does not imply
+> compatibility.
 
 ---
 
-## 4. 构建（tsup）
+## 3. semver contract discipline
+
+- **Breaking changes** (removing/renaming envelope fields, commands, events, or
+  error codes, or changing their semantics/requiredness) → **bump npm major**
+  and **bump `PROTOCOL_MAJOR` in sync**; the runtime handshake rejects
+  incompatible peers.
+- Backward-compatible additions (new command/event/optional field) → minor.
+- Fixes/comments/build → patch.
+- **Runtime compatibility is governed by the handshake `PROTOCOL_MAJOR`**; the
+  npm version is for dependency management only.
+- `decodeEnvelope` performs minimal runtime structural validation
+  (protocol/major/kind/required fields); `RuntimeHello` (`kind:'hello'`) has no
+  checkoutId yet during handshake and is recognized separately by the transport,
+  not via `decodeEnvelope`.
+
+---
+
+## 4. Build (tsup)
 
 ```bash
-pnpm --filter @sunbay/checkout-sdk-protocol run build        # tsup：esm(.mjs)+cjs(.cjs)+dts
+pnpm --filter @sunbay/checkout-sdk-protocol run build        # tsup: esm(.mjs)+cjs(.cjs)+dts
 pnpm --filter @sunbay/checkout-sdk-protocol run type-check   # tsc --noEmit
 ```
 
-- `tsup.config.ts`：entry `src/index.ts`，format `['esm','cjs']`，`dts: true`，`sourcemap: true`，`clean: true`。
-- 产物在 `dist/`：`index.mjs` / `index.cjs` / `index.d.ts`(+`.d.cts`)。`package.json` 的 `exports` / `main` / `module` / `types` 指向这些产物；`files` 仅发布 `dist`。
-- `js` 的 type-check/build 依赖本包 `dist`，因此**改协议后必须先 build 本包**，js 才能拿到最新类型与产物（workspace 下即时生效）。
+- `tsup.config.ts`: entry `src/index.ts`, formats `['esm','cjs']`, `dts: true`,
+  `sourcemap: true`, `clean: true`.
+- Artifacts in `dist/`: `index.mjs` / `index.cjs` / `index.d.ts` (+`.d.cts`).
+  `package.json`'s `exports` / `main` / `module` / `types` point to them;
+  `files` publishes only `dist`.
+- `js` type-check/build depends on this package's `dist`, so **after changing
+  the protocol you must build this package first** for js to pick up the latest
+  types and artifacts (immediate within the workspace).
 
 ---
 
-## 5. 注意事项
+## 5. Notes
 
-- 改协议时，若 `checkout` 仓库的 hosted runtime 有对应文档（如 bridge/payload 规格），代码与文档须同步。
-- 不要重新引入已废弃的 `sync-protocol.mjs` 源码副本机制。
+- When changing the protocol, if the `checkout` repo's hosted runtime has
+  corresponding docs (e.g. bridge/payload specs), keep code and docs in sync.
+- Do not reintroduce the deprecated `sync-protocol.mjs` source-copy mechanism.

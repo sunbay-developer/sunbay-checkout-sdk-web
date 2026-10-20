@@ -57,7 +57,6 @@ export {
     type FocusEvent,
     type BlurEvent,
     type LoadErrorEvent,
-    type AvailablePaymentMethodsChangeEvent,
     type ExpressAvailabilityChangeEvent,
     type PaymentStateChangeEvent,
     type PaymentResultEvent,

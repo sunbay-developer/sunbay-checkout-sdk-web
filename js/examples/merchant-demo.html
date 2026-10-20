@@ -219,7 +219,7 @@
                         // 快捷支付（Apple / Google Pay）：钱包按钮由 express Element 自渲染，
                         // 可用性取决于会话允许 ∩ 浏览器环境（需 Safari+Apple 设备 / Chrome+GPay）。
                         const express = checkout.create('expressCheckout');
-                        express.on('availablePaymentMethodsChange', function (evt) {
+                        express.on('expressAvailabilityChange', function (evt) {
                             show('express 可用钱包变化：', evt);
                         });
 
