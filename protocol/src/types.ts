@@ -108,11 +108,67 @@ export interface CheckoutError {
 }
 
 /**
- * 外观定制（appearance）。首期为开放映射，交由托管侧解释。
+ * 白名单设计变量（映射到 hosted 侧 `ThemeConfig`，复用现有 `generateThemeStyles` 与深色推导）。
+ *
+ * 全部可选；值为颜色或长度字符串，由 hosted 侧白名单校验器校验后方可进入 `<style>`。
+ * 属性名使用 camelCase（如 `borderRadius`），hosted 侧转 kebab。
+ */
+export interface AppearanceVariables {
+    /** 主色 → `ThemeConfig.primary`（并联动 ring）。 */
+    colorPrimary?: string;
+    /** 背景色 → background / card / popover。 */
+    colorBackground?: string;
+    /** 文字色 → foreground。 */
+    colorText?: string;
+    /** 边框色 → border / input。 */
+    colorBorder?: string;
+    /** 危险色 → destructive。 */
+    colorDanger?: string;
+    /** 圆角 → radius（长度值）。 */
+    borderRadius?: string;
+    /** 字体族 → `:root` font-family（不进 `ThemeConfig`，单独注入）。 */
+    fontFamily?: string;
+}
+
+/**
+ * rules 可定制的元素锚点（语义 key，对应 hosted 侧 `data-sunbay-el`）。
+ *
+ * 选择器由 hosted 生成，商户只提供语义 key，不接受选择器字符串。
+ * - `'input'`：卡号 / 有效期 / CVV 输入框；
+ * - `'input:focus'`：输入框聚焦态；
+ * - `'input:invalid'`：输入框错误态（`[data-sunbay-invalid]`）；
+ * - `'label'`：iframe 内标签文字；
+ * - `'error'`：iframe 内错误文字；
+ * - `'cardBrand'`：卡品牌图标容器；
+ * - `'cvvIcon'`：CVV 图标。
+ */
+export type AppearanceRuleTarget =
+    | 'input'
+    | 'input:focus'
+    | 'input:invalid'
+    | 'label'
+    | 'error'
+    | 'cardBrand'
+    | 'cvvIcon';
+
+/**
+ * 单条 rule：白名单 CSS 属性（camelCase 或 kebab）到值的映射。
+ *
+ * 属性名与值均由 hosted 侧白名单校验后方可进入 `<style>`；非白名单属性 / 非法值被丢弃。
+ */
+export type AppearanceRuleStyle = Record<string, string>;
+
+/**
+ * 外观定制（appearance）。受控两层：`variables`（整体风格的白名单设计变量）+
+ * `rules`（关键元素精调的受控语义选择器）。因 iframe 跨域 + PCI 合规，**不开放任意 CSS**。
+ *
+ * 所有进入 `<style>` 的文本全程由 hosted 侧白名单校验；appearance 不含任何卡值 / 支付参数。
  */
 export interface Appearance {
-    theme?: string;
-    variables?: Record<string, string>;
+    /** 白名单设计变量（整体风格）。 */
+    variables?: AppearanceVariables;
+    /** 受控语义规则（关键元素精调）；key 限 `AppearanceRuleTarget`。 */
+    rules?: Partial<Record<AppearanceRuleTarget, AppearanceRuleStyle>>;
     /**
      * 配色方案偏好。
      * - `'light'`：浅色；
