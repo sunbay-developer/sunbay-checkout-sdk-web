@@ -1,0 +1,11 @@
+# Secrets — sandbox merchant credentials, never committed.
+.env.local
+
+# Playwright artifacts.
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Node.
+node_modules/

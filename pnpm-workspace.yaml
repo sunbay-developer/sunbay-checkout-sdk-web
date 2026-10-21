@@ -1,6 +1,7 @@
 packages:
   - protocol
   - js
+  - test-e2e
   # - react   # 成包后再加
 
 allowBuilds:

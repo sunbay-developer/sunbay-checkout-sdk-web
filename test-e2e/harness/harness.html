@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Checkout SDK e2e harness</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                margin: 24px;
+                max-width: 720px;
+            }
+            .slot {
+                min-height: 8px;
+                margin: 8px 0;
+            }
+            h1 {
+                font-size: 16px;
+            }
+            /* Slots are plain empty containers; the SDK mounts visible iframes into them. */
+        </style>
+    </head>
+    <body>
+        <h1>Checkout SDK e2e harness</h1>
+        <p id="status">loading SDK…</p>
+
+        <!-- Mount slots (unique ids, empty). Keep in sync with harness-design.md. -->
+        <div class="slot" id="slot-card"></div>
+        <div class="slot" id="slot-card2"></div>
+        <div class="slot" id="slot-num"></div>
+        <div class="slot" id="slot-exp"></div>
+        <div class="slot" id="slot-cvc"></div>
+        <div class="slot" id="slot-bill"></div>
+        <div class="slot" id="slot-ship"></div>
+        <div class="slot" id="slot-express"></div>
+        <!-- Spare slots for conflict / duplicate cases. -->
+        <div class="slot" id="slot-num1"></div>
+        <div class="slot" id="slot-num2"></div>
+        <div class="slot" id="slot-b1"></div>
+        <div class="slot" id="slot-b2"></div>
+        <div class="slot" id="slot-e1"></div>
+        <div class="slot" id="slot-e2"></div>
+
+        <!-- Load the real published SDK IIFE build (exposes window.SunbayCheckout). -->
+        <script src="/dist/index.global.js"></script>
+        <!-- Harness driver: defines window.__sunbayHarness. -->
+        <script type="module" src="/harness/harness.mjs"></script>
+    </body>
+</html>
