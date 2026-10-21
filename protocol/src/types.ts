@@ -1,23 +1,24 @@
 /**
- * 协议公开类型（真源）。
+ * Public protocol types (source of truth).
  *
- * 这些类型对外公开，供商户侧 SDK（transport/CheckoutInstance/Element）与
- * checkout 托管侧同步副本共同引用。字段与 checkout 后端现有类型对齐，但
- * 对外视图（PublicSessionView）**不含** rsaPublicKey 等敏感/内部字段。
+ * These types are public and shared by the merchant-side SDK (transport/CheckoutInstance/Element)
+ * and the checkout hosted-side synchronized copy. Fields align with the existing checkout backend
+ * types, but the public view (PublicSessionView) does **not** include sensitive/internal fields
+ * such as rsaPublicKey.
  */
 
 /**
- * 交易状态（直接复用 checkout 后端 TxnStatus，不转义）。
- * - `I` = 未支付 / 已创建（非终态）
- * - `S` = 成功（终态）
- * - `F` = 失败（终态）
- * - `R` = 需跳转 / 处理中（非终态）
+ * Transaction status (reuses the checkout backend TxnStatus verbatim, no translation).
+ * - `I` = unpaid / created (non-terminal)
+ * - `S` = succeeded (terminal)
+ * - `F` = failed (terminal)
+ * - `R` = requires redirect / processing (non-terminal)
  */
 export type TxnStatus = 'I' | 'S' | 'F' | 'R';
 
 /**
- * 地址信息（对齐 checkout 后端 AddressInfo 字段）。
- * 非敏感数据，允许经公共协议传输。
+ * Address information (aligned with the checkout backend AddressInfo fields).
+ * Non-sensitive data; allowed to be transmitted over the public protocol.
  */
 export interface AddressInfo {
     country: string;
@@ -33,11 +34,11 @@ export interface AddressInfo {
     phone?: string;
 }
 
-/** 首期支持的支付方式。 */
+/** Payment methods supported in the first phase. */
 export type PaymentMethod = 'card' | 'applePay' | 'googlePay';
 
 /**
- * 公开支付方式视图（对外只暴露 method/type/name/logoUrl，不含内部配置）。
+ * Public payment method view (only exposes method/type/name/logoUrl, no internal config).
  */
 export interface PublicPaymentMethod {
     method: string;
@@ -46,7 +47,7 @@ export interface PublicPaymentMethod {
     logoUrl: string;
 }
 
-/** 公开商品行。 */
+/** Public product line. */
 export interface PublicProductLine {
     amount: number;
     name: string;
@@ -54,8 +55,8 @@ export interface PublicProductLine {
 }
 
 /**
- * 公开 Session 视图：金额 / 币种 / 商品 / collect 标记 / 可用支付方式 / 商户信息。
- * **不含** rsaPublicKey 等敏感或内部字段。
+ * Public session view: amount / currency / products / collect flags / available payment methods /
+ * merchant info. Does **not** include sensitive or internal fields such as rsaPublicKey.
  */
 export interface PublicSessionView {
     sessionId: string;
@@ -76,8 +77,8 @@ export interface PublicSessionView {
 }
 
 /**
- * 支付结果四态（spec 8.2）。
- * `pending` 非终态，消费者不得只接受首条结果。
+ * Four payment outcome states (spec 8.2).
+ * `pending` is non-terminal; consumers must not accept only the first result.
  */
 export type PaymentOutcome =
     | { status: 'succeeded'; operationId: string; txnId: string }
@@ -85,7 +86,7 @@ export type PaymentOutcome =
     | { status: 'canceled'; operationId: string }
     | { status: 'pending'; operationId: string; txnId?: string };
 
-/** 错误分类（spec 5.4）。 */
+/** Error categories (spec 5.4). */
 export type CheckoutErrorCategory =
     | 'configuration'
     | 'validation'
@@ -94,11 +95,11 @@ export type CheckoutErrorCategory =
     | 'payment';
 
 /**
- * 结构化错误（spec 5.4）。
+ * Structured error (spec 5.4).
  */
 export interface CheckoutError {
     code: string;
-    /** 展示用消息。 */
+    /** Message for display. */
     message: string;
     category: CheckoutErrorCategory;
     errorId: string;
@@ -108,39 +109,43 @@ export interface CheckoutError {
 }
 
 /**
- * 白名单设计变量（映射到 hosted 侧 `ThemeConfig`，复用现有 `generateThemeStyles` 与深色推导）。
+ * Whitelisted design variables (mapped to the hosted-side `ThemeConfig`, reusing the existing
+ * `generateThemeStyles` and dark-mode derivation).
  *
- * 全部可选；值为颜色或长度字符串，由 hosted 侧白名单校验器校验后方可进入 `<style>`。
- * 属性名使用 camelCase（如 `borderRadius`），hosted 侧转 kebab。
+ * All optional; values are color or length strings, and only enter `<style>` after being validated
+ * by the hosted-side whitelist validator. Property names use camelCase (e.g. `borderRadius`); the
+ * hosted side converts them to kebab-case.
  */
 export interface AppearanceVariables {
-    /** 主色 → `ThemeConfig.primary`（并联动 ring）。 */
+    /** Primary color → `ThemeConfig.primary` (also drives ring). */
     colorPrimary?: string;
-    /** 背景色 → background / card / popover。 */
+    /** Background color → background / card / popover. */
     colorBackground?: string;
-    /** 文字色 → foreground。 */
+    /** Text color → foreground. */
     colorText?: string;
-    /** 边框色 → border / input。 */
+    /** Border color → border / input. */
     colorBorder?: string;
-    /** 危险色 → destructive。 */
+    /** Danger color → destructive. */
     colorDanger?: string;
-    /** 圆角 → radius（长度值）。 */
+    /** Border radius → radius (length value). */
     borderRadius?: string;
-    /** 字体族 → `:root` font-family（不进 `ThemeConfig`，单独注入）。 */
+    /** Font family → `:root` font-family (not part of `ThemeConfig`, injected separately). */
     fontFamily?: string;
 }
 
 /**
- * rules 可定制的元素锚点（语义 key，对应 hosted 侧 `data-sunbay-el`）。
+ * Customizable element anchors for rules (semantic keys, corresponding to the hosted-side
+ * `data-sunbay-el`).
  *
- * 选择器由 hosted 生成，商户只提供语义 key，不接受选择器字符串。
- * - `'input'`：卡号 / 有效期 / CVV 输入框；
- * - `'input:focus'`：输入框聚焦态；
- * - `'input:invalid'`：输入框错误态（`[data-sunbay-invalid]`）；
- * - `'label'`：iframe 内标签文字；
- * - `'error'`：iframe 内错误文字；
- * - `'cardBrand'`：卡品牌图标容器；
- * - `'cvvIcon'`：CVV 图标。
+ * Selectors are generated by the hosted side; merchants only provide semantic keys and selector
+ * strings are not accepted.
+ * - `'input'`: card number / expiry / CVV input fields;
+ * - `'input:focus'`: input focus state;
+ * - `'input:invalid'`: input error state (`[data-sunbay-invalid]`);
+ * - `'label'`: label text inside the iframe;
+ * - `'error'`: error text inside the iframe;
+ * - `'cardBrand'`: card brand icon container;
+ * - `'cvvIcon'`: CVV icon.
  */
 export type AppearanceRuleTarget =
     | 'input'
@@ -152,46 +157,51 @@ export type AppearanceRuleTarget =
     | 'cvvIcon';
 
 /**
- * 单条 rule：白名单 CSS 属性（camelCase 或 kebab）到值的映射。
+ * A single rule: a mapping from whitelisted CSS properties (camelCase or kebab) to values.
  *
- * 属性名与值均由 hosted 侧白名单校验后方可进入 `<style>`；非白名单属性 / 非法值被丢弃。
+ * Both property names and values only enter `<style>` after hosted-side whitelist validation;
+ * non-whitelisted properties / invalid values are discarded.
  */
 export type AppearanceRuleStyle = Record<string, string>;
 
 /**
- * 外观定制（appearance）。受控两层：`variables`（整体风格的白名单设计变量）+
- * `rules`（关键元素精调的受控语义选择器）。因 iframe 跨域 + PCI 合规，**不开放任意 CSS**。
+ * Appearance customization. Controlled in two layers: `variables` (whitelisted design variables for
+ * the overall style) + `rules` (controlled semantic selectors for fine-tuning key elements). Due to
+ * cross-origin iframes + PCI compliance, arbitrary CSS is **not** allowed.
  *
- * 所有进入 `<style>` 的文本全程由 hosted 侧白名单校验；appearance 不含任何卡值 / 支付参数。
+ * All text entering `<style>` is whitelist-validated by the hosted side throughout; appearance
+ * contains no card values / payment parameters.
  */
 export interface Appearance {
-    /** 白名单设计变量（整体风格）。 */
+    /** Whitelisted design variables (overall style). */
     variables?: AppearanceVariables;
-    /** 受控语义规则（关键元素精调）；key 限 `AppearanceRuleTarget`。 */
+    /** Controlled semantic rules (fine-tuning key elements); keys limited to `AppearanceRuleTarget`. */
     rules?: Partial<Record<AppearanceRuleTarget, AppearanceRuleStyle>>;
     /**
-     * 配色方案偏好。
-     * - `'light'`：浅色；
-     * - `'dark'`：深色；
-     * - `'auto'`：跟随系统 / 宿主环境。
+     * Color scheme preference.
+     * - `'light'`: light;
+     * - `'dark'`: dark;
+     * - `'auto'`: follow the system / host environment.
      *
-     * 协议层只定义类型；缺省时的默认语义（SDK 默认 `'light'`）由消费方实现，
-     * 协议不强制默认值。向后兼容的可选新增字段。
+     * The protocol layer only defines the type; the default semantics when omitted (the SDK defaults
+     * to `'light'`) are implemented by the consumer, and the protocol does not enforce a default
+     * value. A backward-compatible optional new field.
      */
     colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 /**
- * 支付方式过滤配置（spec 9：只做减法/排序，禁止前端增开）。
+ * Payment method filter configuration (spec 9: subtraction/ordering only, enabling new methods on
+ * the frontend is forbidden).
  */
 export interface PaymentMethodFilter {
-    /** 要隐藏的支付方式（method 标识）。 */
+    /** Payment methods to hide (method identifiers). */
     hide?: string[];
-    /** 展示顺序（method 标识）。 */
+    /** Display order (method identifiers). */
     order?: string[];
 }
 
-/** 可挂载 Element 类型（spec 6）。 */
+/** Mountable Element types (spec 6). */
 export type ElementType =
     | 'card'
     | 'cardNumber'
@@ -200,7 +210,7 @@ export type ElementType =
     | 'address'
     | 'expressCheckout';
 
-/** card Element 配置（spec 6）。 */
+/** card Element options (spec 6). */
 export interface CardElementOptions {
     showBillingAddress?: boolean;
     showShippingAddress?: boolean;
@@ -208,24 +218,24 @@ export interface CardElementOptions {
     appearance?: Appearance;
 }
 
-/** 拆分卡字段配置（spec 6）。 */
+/** Split card field options (spec 6). */
 export interface CardFieldElementOptions {
     appearance?: Appearance;
 }
 
-/** address Element 配置（spec 6）。 */
+/** address Element options (spec 6). */
 export interface AddressElementOptions {
     mode: 'billing' | 'shipping';
     appearance?: Appearance;
 }
 
-/** Apple Pay 官方按钮主题。缺省跟随当前配色（浅 black / 深 white）。 */
+/** Apple Pay official button theme. Defaults to follow the current color scheme (light black / dark white). */
 export type ApplePayButtonTheme = 'black' | 'white' | 'white-outline';
 
-/** Google Pay 官方按钮主题。缺省跟随当前配色（浅 black / 深 white）。 */
+/** Google Pay official button theme. Defaults to follow the current color scheme (light black / dark white). */
 export type GooglePayButtonTheme = 'black' | 'white' | 'default';
 
-/** Apple Pay 官方按钮文案类型（`apple-pay-button` 的 `type` 属性，官方全集）。 */
+/** Apple Pay official button text type (the `type` attribute of `apple-pay-button`, full official set). */
 export type ApplePayButtonType =
     | 'plain'
     | 'buy'
@@ -242,7 +252,7 @@ export type ApplePayButtonType =
     | 'contribute'
     | 'tip';
 
-/** Google Pay 官方按钮文案类型（`buttonType`，官方全集）。 */
+/** Google Pay official button text type (`buttonType`, full official set). */
 export type GooglePayButtonType =
     | 'buy'
     | 'plain'
@@ -253,62 +263,64 @@ export type GooglePayButtonType =
     | 'order'
     | 'subscribe';
 
-/** Apple Pay 单钱包配置（显示时的细粒度选项）。 */
+/** Apple Pay single-wallet options (fine-grained options when shown). */
 export interface ApplePayOptions {
-    /** 按钮主题；缺省跟随当前配色。 */
+    /** Button theme; defaults to follow the current color scheme. */
     buttonTheme?: ApplePayButtonTheme;
-    /** 按钮文案类型；缺省 `'pay'`。 */
+    /** Button text type; defaults to `'pay'`. */
     buttonType?: ApplePayButtonType;
 }
 
-/** Google Pay 单钱包配置（显示时的细粒度选项）。 */
+/** Google Pay single-wallet options (fine-grained options when shown). */
 export interface GooglePayOptions {
-    /** 按钮主题；缺省跟随当前配色。 */
+    /** Button theme; defaults to follow the current color scheme. */
     buttonTheme?: GooglePayButtonTheme;
-    /** 按钮文案类型；缺省 `'pay'`。 */
+    /** Button text type; defaults to `'pay'`. */
     buttonType?: GooglePayButtonType;
 }
 
-/** expressCheckout Element 配置（spec 6）。 */
+/** expressCheckout Element options (spec 6). */
 export interface ExpressCheckoutElementOptions {
     /**
-     * 各钱包开关 / 配置：
-     * - `false`：强制隐藏该钱包；
-     * - `true` 或缺省：自动显示（后端业务允许 ∩ 环境可用），主题跟随当前配色；
-     * - 配置对象：自动显示，并应用对象内的细粒度配置（如 buttonTheme）。
+     * Per-wallet toggle / configuration:
+     * - `false`: force-hide this wallet;
+     * - `true` or omitted: auto-show (backend business allows ∩ environment available), theme follows
+     *   the current color scheme;
+     * - config object: auto-show, and apply the fine-grained config in the object (e.g. buttonTheme).
      */
     paymentMethods?: {
         applePay?: boolean | ApplePayOptions;
         googlePay?: boolean | GooglePayOptions;
     };
-    /** 布局约束（首期仅最大列数）。 */
+    /** Layout constraints (first phase: maximum columns only). */
     layout?: {
         maxColumns?: number;
     };
-    /** 钱包按钮高度（像素，全局应用到所有钱包按钮）。hosted 侧 clamp 到 [30, 64]；缺省 40。 */
+    /** Wallet button height (pixels, applied globally to all wallet buttons). The hosted side clamps to [30, 64]; defaults to 40. */
     buttonHeight?: number;
 }
 
 /**
- * express 可用钱包视图（spec 6）。
- * 表示各钱包在当前环境下是否可用，用于 express 可用性事件载荷。
+ * Express available wallets view (spec 6).
+ * Indicates whether each wallet is available in the current environment; used as the payload for the
+ * express availability event.
  */
 export interface AvailableWallets {
     applePay: boolean;
     googlePay: boolean;
 }
 
-/** Element 配置联合（按 type 区分）。 */
+/** Element options union (distinguished by type). */
 export type ElementOptions =
     | CardElementOptions
     | CardFieldElementOptions
     | AddressElementOptions
     | ExpressCheckoutElementOptions;
 
-/** Element 运行状态机（spec 6）。 */
+/** Element runtime state machine (spec 6). */
 export type ElementStatus = 'created' | 'loading' | 'ready' | 'destroyed' | 'loadError';
 
-/** action 载荷（spec 8.3；qrCode/showContent 首期预留）。 */
+/** action payload (spec 8.3; qrCode/showContent reserved for the first phase). */
 export interface PaymentAction {
     type: 'qrCode' | 'redirect' | 'showContent';
     redirectUrl?: string;

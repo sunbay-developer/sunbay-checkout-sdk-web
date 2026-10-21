@@ -6,7 +6,8 @@ test('version is a string', () => {
 });
 
 test('version is a valid semver', () => {
-    // 构建期由 tsup 从 package.json 注入；vitest 下无 define 替换，走回退 '0.0.0'。
-    // 两种情形都必须是合法 semver 前缀，防回归到占位脱钩值。
+    // Injected by tsup from package.json at build time; under vitest there is no define
+    // replacement, so it falls back to '0.0.0'. Both cases must be a valid semver prefix
+    // to prevent regressing to a decoupled placeholder value.
     expect(version).toMatch(/^\d+\.\d+\.\d+/);
 });

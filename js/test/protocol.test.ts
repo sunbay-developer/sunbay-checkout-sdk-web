@@ -7,8 +7,9 @@ import {
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
- * 协议契约测试（真源：protocol/src）。
- * 覆盖：encode/decode 往返相等、缺字段校验、未知 name 的 request 由调用方拒、错误码常量。
+ * Protocol contract tests (source of truth: protocol/src).
+ * Covers: encode/decode round-trip equality, missing-field validation, request with unknown name
+ * rejected by the caller, error code constants.
  */
 describe('protocol envelope', () => {
     const baseRequest: Envelope = {
@@ -22,14 +23,14 @@ describe('protocol envelope', () => {
         payload: { sessionId: 'sess_1', locale: 'en' },
     };
 
-    it('decodeEnvelope(encodeEnvelope(req)) 往返相等', () => {
+    it('decodeEnvelope(encodeEnvelope(req)) round-trips equal', () => {
         const wire = encodeEnvelope(baseRequest);
         expect(typeof wire).toBe('string');
         const decoded = decodeEnvelope(wire);
         expect(decoded).toEqual(baseRequest);
     });
 
-    it('response/event 信封同样往返相等', () => {
+    it('response/event envelopes round-trip equal too', () => {
         const okResponse: Envelope = {
             protocol: 'sunbay-checkout',
             major: 1,
@@ -55,7 +56,7 @@ describe('protocol envelope', () => {
         expect(decodeEnvelope(encodeEnvelope(event))).toEqual(event);
     });
 
-    it('缺 protocol 字段抛错', () => {
+    it('throws when protocol field is missing', () => {
         const bad = JSON.stringify({
             major: 1,
             runtimeId: 'rt_1',
@@ -68,22 +69,22 @@ describe('protocol envelope', () => {
         expect(() => decodeEnvelope(bad)).toThrow();
     });
 
-    it('错误 protocol 值抛错', () => {
+    it('throws on wrong protocol value', () => {
         const bad = JSON.stringify({ ...baseRequest, protocol: 'not-sunbay' });
         expect(() => decodeEnvelope(bad)).toThrow();
     });
 
-    it('错误 major 抛错', () => {
+    it('throws on wrong major', () => {
         const bad = JSON.stringify({ ...baseRequest, major: 2 });
         expect(() => decodeEnvelope(bad)).toThrow();
     });
 
-    it('非法 kind 抛错', () => {
+    it('throws on invalid kind', () => {
         const bad = JSON.stringify({ ...baseRequest, kind: 'bogus' });
         expect(() => decodeEnvelope(bad)).toThrow();
     });
 
-    it('request 缺必填 name 抛错', () => {
+    it('throws when request is missing required name', () => {
         const bad = JSON.stringify({
             protocol: 'sunbay-checkout',
             major: 1,
@@ -96,11 +97,11 @@ describe('protocol envelope', () => {
         expect(() => decodeEnvelope(bad)).toThrow();
     });
 
-    it('非 JSON 字符串抛错', () => {
+    it('throws on non-JSON string', () => {
         expect(() => decodeEnvelope('{not json')).toThrow();
     });
 
-    it("未知 name 的 request 解出后 kind==='request'（由调用方拒绝）", () => {
+    it("request with unknown name decodes to kind==='request' (rejected by the caller)", () => {
         const unknown: Envelope = {
             protocol: 'sunbay-checkout',
             major: 1,
@@ -113,7 +114,8 @@ describe('protocol envelope', () => {
         };
         const decoded = decodeEnvelope(encodeEnvelope(unknown));
         expect(decoded.kind).toBe('request');
-        // 解码器不校验 name 是否为已知 CommandName —— 交由调用方（Orchestrator）拒绝。
+        // The decoder does not validate whether name is a known CommandName — that is left to the
+        // caller (Orchestrator) to reject.
         if (decoded.kind === 'request') {
             expect(decoded.name).toBe('totallyUnknownCommand');
         }
@@ -125,7 +127,7 @@ describe('protocol error codes', () => {
         expect(ErrorCode.CHECKOUT_BUSY).toBe('CHECKOUT_BUSY');
     });
 
-    it('错误码常量全集存在且值自等', () => {
+    it('all error code constants exist and are self-equal', () => {
         const codes = [
             'INVALID_OPTIONS',
             'ELEMENT_CONFLICT',
@@ -146,9 +148,9 @@ describe('protocol error codes', () => {
 });
 
 /**
- * expressCheckout 协议补充契约测试（真源：protocol/src）。
- * 覆盖：ExpressCheckoutElementOptions 精确结构可编解码；AvailableWallets 存在；
- * express 可用性事件载荷含 applePay/googlePay 布尔。
+ * expressCheckout protocol supplementary contract tests (source of truth: protocol/src).
+ * Covers: ExpressCheckoutElementOptions exact structure encodes/decodes; AvailableWallets exists;
+ * express availability event payload contains applePay/googlePay booleans.
  */
 import { EVENT_NAMES, isEventName } from '@sunbay/checkout-sdk-protocol';
 import type {
@@ -165,12 +167,12 @@ import type {
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
- * Appearance.colorScheme 协议契约测试（真源：protocol/src）。
- * 覆盖：带 colorScheme:'dark' 的 Appearance 类型检查通过且 JSON 往返保留 colorScheme；
- * 'light' | 'dark' | 'auto' 三值合法；colorScheme 可省略（向后兼容）。
+ * Appearance.colorScheme protocol contract tests (source of truth: protocol/src).
+ * Covers: Appearance with colorScheme:'dark' type-checks and JSON round-trip preserves colorScheme;
+ * 'light' | 'dark' | 'auto' are all valid; colorScheme may be omitted (backward compatible).
  */
 describe('protocol Appearance colorScheme', () => {
-    it("带 colorScheme:'dark' 的 Appearance 类型检查通过且 JSON 往返保留 colorScheme", () => {
+    it("Appearance with colorScheme:'dark' type-checks and JSON round-trip preserves colorScheme", () => {
         const appearance: Appearance = {
             variables: { colorPrimary: '#000' },
             colorScheme: 'dark',
@@ -180,7 +182,7 @@ describe('protocol Appearance colorScheme', () => {
         expect(decoded.colorScheme).toBe('dark');
     });
 
-    it("colorScheme 接受 'light' | 'dark' | 'auto' 三值", () => {
+    it("colorScheme accepts the three values 'light' | 'dark' | 'auto'", () => {
         const schemes = ['light', 'dark', 'auto'] as const;
         for (const scheme of schemes) {
             const appearance: Appearance = { colorScheme: scheme };
@@ -189,7 +191,7 @@ describe('protocol Appearance colorScheme', () => {
         }
     });
 
-    it('colorScheme 可省略（向后兼容）', () => {
+    it('colorScheme may be omitted (backward compatible)', () => {
         const appearance: Appearance = { variables: { colorPrimary: '#000' } };
         const decoded = JSON.parse(JSON.stringify(appearance)) as Appearance;
         expect(decoded).toEqual(appearance);
@@ -198,7 +200,7 @@ describe('protocol Appearance colorScheme', () => {
 });
 
 describe('protocol expressCheckout options', () => {
-    it('ExpressCheckoutElementOptions 精确结构可编解码往返相等', () => {
+    it('ExpressCheckoutElementOptions exact structure encodes/decodes round-trip equal', () => {
         const opts: ExpressCheckoutElementOptions = {
             paymentMethods: { applePay: true, googlePay: false },
             layout: { maxColumns: 2 },
@@ -213,14 +215,14 @@ describe('protocol expressCheckout options', () => {
         expect(decoded.buttonHeight).toBe(48);
     });
 
-    it('ExpressCheckoutElementOptions 允许全部字段省略（向后兼容）', () => {
+    it('ExpressCheckoutElementOptions allows all fields omitted (backward compatible)', () => {
         const opts: ExpressCheckoutElementOptions = {};
         expect(JSON.parse(JSON.stringify(opts))).toEqual(opts);
     });
 });
 
 describe('protocol available wallets event', () => {
-    it('AvailableWallets 含 applePay/googlePay 布尔', () => {
+    it('AvailableWallets contains applePay/googlePay booleans', () => {
         const wallets: AvailableWallets = { applePay: true, googlePay: false };
         const decoded = JSON.parse(JSON.stringify(wallets)) as AvailableWallets;
         expect(typeof decoded.applePay).toBe('boolean');
@@ -229,7 +231,7 @@ describe('protocol available wallets event', () => {
         expect(decoded.googlePay).toBe(false);
     });
 
-    it('ExpressAvailabilityChangeEvent 载荷含 availableWallets', () => {
+    it('ExpressAvailabilityChangeEvent payload contains availableWallets', () => {
         const evt: ExpressAvailabilityChangeEvent = {
             availableWallets: { applePay: false, googlePay: true },
         };
@@ -238,7 +240,7 @@ describe('protocol available wallets event', () => {
         expect(decoded.availableWallets.googlePay).toBe(true);
     });
 
-    it('ElementReadyEvent 可携带可选 availableWallets: AvailableWallets', () => {
+    it('ElementReadyEvent may carry optional availableWallets: AvailableWallets', () => {
         const evt: ElementReadyEvent = {
             elementId: 'el_express',
             availableWallets: { applePay: true, googlePay: true },
@@ -250,34 +252,35 @@ describe('protocol available wallets event', () => {
 });
 
 /**
- * expressCheckout 可用性事件登记契约（W1 + M1）。
- * 覆盖：'expressAvailabilityChange' 属于 EventName 且在 EVENT_NAMES；
- * EventPayloadMap['expressAvailabilityChange'] 为 ExpressAvailabilityChangeEvent；
- * ElementReadyEvent 与事件统一使用 availableWallets 字段。
+ * expressCheckout availability event registration contract (W1 + M1).
+ * Covers: 'expressAvailabilityChange' is an EventName and present in EVENT_NAMES;
+ * EventPayloadMap['expressAvailabilityChange'] is ExpressAvailabilityChangeEvent;
+ * ElementReadyEvent and the event share the availableWallets field.
  */
 describe('protocol express availability event registration', () => {
-    it("'expressAvailabilityChange' 在 EVENT_NAMES 且被 isEventName 识别", () => {
+    it("'expressAvailabilityChange' is in EVENT_NAMES and recognized by isEventName", () => {
         expect(EVENT_NAMES).toContain('expressAvailabilityChange');
         expect(isEventName('expressAvailabilityChange')).toBe(true);
     });
 
-    it("'expressAvailabilityChange' 属于 EventName 联合类型", () => {
+    it("'expressAvailabilityChange' belongs to the EventName union type", () => {
         const name: EventName = 'expressAvailabilityChange';
         expect(name).toBe('expressAvailabilityChange');
     });
 
-    it("EventPayloadMap['expressAvailabilityChange'] 为 ExpressAvailabilityChangeEvent", () => {
+    it("EventPayloadMap['expressAvailabilityChange'] is ExpressAvailabilityChangeEvent", () => {
         const payload: EventPayloadMap['expressAvailabilityChange'] = {
             availableWallets: { applePay: true, googlePay: false },
         };
-        // 类型等价断言：同一引用可互赋，证明映射值即 ExpressAvailabilityChangeEvent。
+        // Type-equivalence assertion: the same reference is mutually assignable, proving the map
+        // value is exactly ExpressAvailabilityChangeEvent.
         const asEvent: ExpressAvailabilityChangeEvent = payload;
         const asPayload: EventPayloadMap['expressAvailabilityChange'] = asEvent;
         expect(asPayload.availableWallets.applePay).toBe(true);
         expect(asPayload.availableWallets.googlePay).toBe(false);
     });
 
-    it('EventPayloadMap.elementReady.availableWallets 可选存在', () => {
+    it('EventPayloadMap.elementReady.availableWallets is optionally present', () => {
         const payload: EventPayloadMap['elementReady'] = {
             elementId: 'el_express',
             availableWallets: { applePay: false, googlePay: true },
@@ -300,30 +303,30 @@ describe('isIframeResizeMessage (iframe auto-resize contract)', () => {
         height: 42,
     };
 
-    it('接受合法消息(type/elementId/height 齐备)', () => {
+    it('accepts a valid message (type/elementId/height all present)', () => {
         expect(isIframeResizeMessage(valid)).toBe(true);
     });
 
-    it('接受 height=0(边界,非负有限)', () => {
+    it('accepts height=0 (boundary, non-negative finite)', () => {
         expect(isIframeResizeMessage({ ...valid, height: 0 })).toBe(true);
     });
 
-    it('拒绝 type 不匹配', () => {
+    it('rejects type mismatch', () => {
         expect(isIframeResizeMessage({ ...valid, type: 'other' })).toBe(false);
     });
 
-    it('拒绝 elementId 空串 / 非字符串', () => {
+    it('rejects empty-string / non-string elementId', () => {
         expect(isIframeResizeMessage({ ...valid, elementId: '' })).toBe(false);
         expect(isIframeResizeMessage({ ...valid, elementId: 123 })).toBe(false);
     });
 
-    it('拒绝 height 非有限 / 负数 / 非数字', () => {
+    it('rejects non-finite / negative / non-number height', () => {
         expect(isIframeResizeMessage({ ...valid, height: Infinity })).toBe(false);
         expect(isIframeResizeMessage({ ...valid, height: -1 })).toBe(false);
         expect(isIframeResizeMessage({ ...valid, height: '42' })).toBe(false);
     });
 
-    it('拒绝非对象 / null', () => {
+    it('rejects non-object / null', () => {
         expect(isIframeResizeMessage(null)).toBe(false);
         expect(isIframeResizeMessage('x')).toBe(false);
         expect(isIframeResizeMessage(undefined)).toBe(false);
@@ -331,9 +334,10 @@ describe('isIframeResizeMessage (iframe auto-resize contract)', () => {
 });
 
 /**
- * expressCheckout 每钱包配置契约（钱包按钮主题跟随 Task 1）。
- * 覆盖：paymentMethods.{applePay,googlePay} 为 `boolean | 对应 Options`；
- * ApplePayOptions/GooglePayOptions.buttonTheme 为白名单联合字面量；四个新符号已从协议包导出。
+ * expressCheckout per-wallet options contract (wallet button theme follows Task 1).
+ * Covers: paymentMethods.{applePay,googlePay} are `boolean | corresponding Options`;
+ * ApplePayOptions/GooglePayOptions.buttonTheme are whitelisted union literals; the four new symbols
+ * are exported from the protocol package.
  */
 import type {
     ApplePayButtonTheme,
@@ -343,7 +347,7 @@ import type {
 } from '@sunbay/checkout-sdk-protocol';
 
 describe('protocol expressCheckout per-wallet options', () => {
-    it('paymentMethods 接受「布尔 | 配置对象」混合形状', () => {
+    it('paymentMethods accepts a mixed "boolean | config object" shape', () => {
         const a: ExpressCheckoutElementOptions = {
             paymentMethods: { applePay: false, googlePay: { buttonTheme: 'white' } },
         };
@@ -358,7 +362,7 @@ describe('protocol expressCheckout per-wallet options', () => {
         expect(decodedB).toEqual(b);
     });
 
-    it('ApplePayButtonTheme 接受 black | white | white-outline', () => {
+    it('ApplePayButtonTheme accepts black | white | white-outline', () => {
         const themes: ApplePayButtonTheme[] = ['black', 'white', 'white-outline'];
         for (const buttonTheme of themes) {
             const opts: ApplePayOptions = { buttonTheme };
@@ -366,7 +370,7 @@ describe('protocol expressCheckout per-wallet options', () => {
         }
     });
 
-    it('GooglePayButtonTheme 接受 black | white | default', () => {
+    it('GooglePayButtonTheme accepts black | white | default', () => {
         const themes: GooglePayButtonTheme[] = ['black', 'white', 'default'];
         for (const buttonTheme of themes) {
             const opts: GooglePayOptions = { buttonTheme };
@@ -374,7 +378,7 @@ describe('protocol expressCheckout per-wallet options', () => {
         }
     });
 
-    it('ApplePayOptions/GooglePayOptions 可省略 buttonTheme', () => {
+    it('ApplePayOptions/GooglePayOptions may omit buttonTheme', () => {
         const apple: ApplePayOptions = {};
         const google: GooglePayOptions = {};
         expect(apple.buttonTheme).toBeUndefined();
@@ -383,7 +387,7 @@ describe('protocol expressCheckout per-wallet options', () => {
 });
 
 describe('protocol appearance variables + rules', () => {
-    it('Appearance 接受白名单 variables + rules + colorScheme', () => {
+    it('Appearance accepts whitelisted variables + rules + colorScheme', () => {
         const variables: AppearanceVariables = {
             colorPrimary: '#3366ff',
             borderRadius: '8px',
@@ -401,7 +405,7 @@ describe('protocol appearance variables + rules', () => {
         expect(appearance.colorScheme).toBe('auto');
     });
 
-    it('AppearanceRuleTarget 覆盖 7 个语义锚点', () => {
+    it('AppearanceRuleTarget covers the 7 semantic anchors', () => {
         const targets: AppearanceRuleTarget[] = [
             'input',
             'input:focus',
@@ -414,14 +418,14 @@ describe('protocol appearance variables + rules', () => {
         expect(targets).toHaveLength(7);
     });
 
-    it('AppearanceRuleStyle 为属性名到值的开放映射', () => {
+    it('AppearanceRuleStyle is an open map from property name to value', () => {
         const style: AppearanceRuleStyle = { color: '#000', 'border-radius': '4px' };
         expect(style.color).toBe('#000');
     });
 
-    it('非白名单 rule target 应被类型层拒绝', () => {
+    it('a non-whitelisted rule target should be rejected at the type layer', () => {
         const appearance: Appearance = {
-            // @ts-expect-error body 不是合法的 AppearanceRuleTarget
+            // @ts-expect-error body is not a valid AppearanceRuleTarget
             rules: { body: {} },
         };
         expect(appearance).toBeDefined();
@@ -429,10 +433,11 @@ describe('protocol appearance variables + rules', () => {
 });
 
 /**
- * expressCheckout 钱包按钮 buttonType + buttonHeight 契约（Task 1）。
- * 覆盖：ApplePayButtonType（14 项官方全集）/ GooglePayButtonType（8 项）为白名单联合字面量；
- * ApplePayOptions/GooglePayOptions.buttonType 可赋合法值、非法值被类型层拒；
- * ExpressCheckoutElementOptions.buttonHeight 与每钱包 buttonType 组合可往返。
+ * expressCheckout wallet button buttonType + buttonHeight contract (Task 1).
+ * Covers: ApplePayButtonType (14 official full set) / GooglePayButtonType (8) are whitelisted union
+ * literals; ApplePayOptions/GooglePayOptions.buttonType accept valid values, invalid values rejected
+ * at the type layer; ExpressCheckoutElementOptions.buttonHeight combines with per-wallet buttonType
+ * and round-trips.
  */
 import type {
     ApplePayButtonType,
@@ -440,7 +445,7 @@ import type {
 } from '@sunbay/checkout-sdk-protocol';
 
 describe('protocol expressCheckout buttonType + buttonHeight', () => {
-    it('ApplePayButtonType 接受 14 项官方全集', () => {
+    it('ApplePayButtonType accepts the 14 official full set', () => {
         const types: ApplePayButtonType[] = [
             'plain',
             'buy',
@@ -460,7 +465,7 @@ describe('protocol expressCheckout buttonType + buttonHeight', () => {
         expect(types).toHaveLength(14);
     });
 
-    it('GooglePayButtonType 接受 8 项官方全集', () => {
+    it('GooglePayButtonType accepts the 8 official full set', () => {
         const types: GooglePayButtonType[] = [
             'buy',
             'plain',
@@ -474,7 +479,7 @@ describe('protocol expressCheckout buttonType + buttonHeight', () => {
         expect(types).toHaveLength(8);
     });
 
-    it('每钱包 buttonType + 全局 buttonHeight 组合可赋值并往返相等', () => {
+    it('per-wallet buttonType + global buttonHeight combination assigns and round-trips equal', () => {
         const opts: ExpressCheckoutElementOptions = {
             paymentMethods: {
                 applePay: { buttonType: 'buy' },
@@ -487,27 +492,27 @@ describe('protocol expressCheckout buttonType + buttonHeight', () => {
         expect(decoded.buttonHeight).toBe(48);
     });
 
-    it('ApplePayOptions/GooglePayOptions 可省略 buttonType（向后兼容）', () => {
+    it('ApplePayOptions/GooglePayOptions may omit buttonType (backward compatible)', () => {
         const apple: ApplePayOptions = {};
         const google: GooglePayOptions = {};
         expect(apple.buttonType).toBeUndefined();
         expect(google.buttonType).toBeUndefined();
     });
 
-    it('非法 applePay buttonType 应被类型层拒绝', () => {
+    it('an invalid applePay buttonType should be rejected at the type layer', () => {
         const opts: ExpressCheckoutElementOptions = {
             paymentMethods: {
-                // @ts-expect-error 'nope' 不是合法的 ApplePayButtonType
+                // @ts-expect-error 'nope' is not a valid ApplePayButtonType
                 applePay: { buttonType: 'nope' },
             },
         };
         expect(opts).toBeDefined();
     });
 
-    it('非法 googlePay buttonType 应被类型层拒绝', () => {
+    it('an invalid googlePay buttonType should be rejected at the type layer', () => {
         const opts: ExpressCheckoutElementOptions = {
             paymentMethods: {
-                // @ts-expect-error 'pay-now' 不是合法的 GooglePayButtonType
+                // @ts-expect-error 'pay-now' is not a valid GooglePayButtonType
                 googlePay: { buttonType: 'pay-now' },
             },
         };

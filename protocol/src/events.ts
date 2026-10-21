@@ -1,8 +1,9 @@
 /**
- * 事件契约（main → 商户 SDK，spec 5.3 表，真源）。
+ * Event contract (main → merchant SDK, spec 5.3 table, source of truth).
  *
- * 公开事件仅暴露 empty/complete/brand/error 等允许状态，**绝不含卡值**，
- * 不提供卡数据 getValue。`on` 注册后不重放历史事件。
+ * Public events only expose allowed states such as empty/complete/brand/error, and **never contain
+ * card values**; no card-data getValue is provided. After `on` registration, historical events are
+ * not replayed.
  */
 
 import type {
@@ -13,7 +14,7 @@ import type {
     PaymentOutcome,
 } from './types';
 
-/** 全部事件名（spec 5.3）。 */
+/** All event names (spec 5.3). */
 export type EventName =
     | 'ready'
     | 'change'
@@ -26,7 +27,7 @@ export type EventName =
     | 'paymentResult'
     | 'error';
 
-/** 已知事件名集合。 */
+/** Set of known event names. */
 export const EVENT_NAMES: readonly EventName[] = [
     'ready',
     'change',
@@ -40,18 +41,18 @@ export const EVENT_NAMES: readonly EventName[] = [
     'error',
 ];
 
-/** 判断字符串是否为已知事件名。 */
+/** Determine whether a string is a known event name. */
 export function isEventName(name: string): name is EventName {
     return (EVENT_NAMES as readonly string[]).includes(name);
 }
 
-// --- 输入 Element 事件 ---
+// --- Input Element events ---
 export interface ReadyEvent {
     elementId: string;
 }
 export interface ElementReadyEvent {
     elementId: string;
-    /** 仅 expressCheckout Element ready 时携带：各钱包可用性。 */
+    /** Only carried when the expressCheckout Element is ready: per-wallet availability. */
     availableWallets?: AvailableWallets;
 }
 export interface ChangeEvent {
@@ -59,7 +60,7 @@ export interface ChangeEvent {
     empty: boolean;
     complete: boolean;
     error?: CheckoutError;
-    /** 仅卡号字段允许携带 brand；绝不含卡值。 */
+    /** Only the card number field may carry brand; never contains card values. */
     brand?: string;
 }
 export interface FocusEvent {
@@ -73,20 +74,21 @@ export interface LoadErrorEvent {
     error: CheckoutError;
 }
 
-// --- Express 事件 ---
+// --- Express events ---
 /**
- * express 可用钱包变化事件（spec 6）。
- * 专用于 expressCheckout：以 AvailableWallets 表达各钱包（Apple/Google Pay）可用性。
+ * Express available-wallets change event (spec 6).
+ * Dedicated to expressCheckout: uses AvailableWallets to express the availability of each wallet
+ * (Apple/Google Pay).
  */
 export interface ExpressAvailabilityChangeEvent {
     availableWallets: AvailableWallets;
 }
 
-// --- Checkout 级事件 ---
+// --- Checkout-level events ---
 export interface PaymentStateChangeEvent {
     operationId: string;
     method: PaymentMethod;
-    /** 过程状态；requiresAction 时携带 action 信息。 */
+    /** Intermediate state; carries action info when requiresAction. */
     state: string;
     action?: PaymentAction;
 }
@@ -96,12 +98,12 @@ export interface PaymentResultEvent {
     outcome: PaymentOutcome;
 }
 export interface ErrorEvent {
-    /** 异步主动流程错误；可含 operationId（如已创建）。 */
+    /** Error in an asynchronous proactive flow; may include operationId (if already created). */
     operationId?: string;
     error: CheckoutError;
 }
 
-/** 事件名 → 载荷映射。 */
+/** Event name → payload mapping. */
 export interface EventPayloadMap {
     ready: ReadyEvent;
     change: ChangeEvent;

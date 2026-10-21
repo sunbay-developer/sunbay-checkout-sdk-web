@@ -1,8 +1,8 @@
 /**
- * 协议错误码常量（单一真源，spec 5.4）。
+ * Protocol error code constants (single source of truth, spec 5.4).
  *
- * 不提供可能误导重复付款的通用 `retryable` 布尔。
- * 仅保留实际会被产出的错误码；新增码须同时有产出点。
+ * Does not provide a generic `retryable` boolean that could mislead into duplicate payments.
+ * Only keeps error codes that are actually produced; new codes must have a production point.
  */
 
 export const ErrorCode = {
@@ -19,5 +19,5 @@ export const ErrorCode = {
     UNSUPPORTED_CAPABILITY: 'UNSUPPORTED_CAPABILITY',
 } as const;
 
-/** 错误码字面量联合类型。 */
+/** Error code literal union type. */
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];

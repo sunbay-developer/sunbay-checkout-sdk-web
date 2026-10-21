@@ -13,15 +13,17 @@ import {
 import type { InstanceTransport } from '../src/CheckoutInstance';
 
 /**
- * createCheckout + CheckoutInstance 契约测试（真源：js/src/{createCheckout,CheckoutInstance}）。
+ * createCheckout + CheckoutInstance contract tests (source of truth:
+ * js/src/{createCheckout,CheckoutInstance}).
  *
- * 环境：jsdom。transport 为 mock（记录 request、持有事件/hello handler，可手动驱动）。
- * createCheckout 允许注入内部 transport 工厂（`__transportFactory`）供测试。
+ * Environment: jsdom. transport is a mock (records requests, holds event/hello handlers, can be
+ * driven manually). createCheckout allows injecting an internal transport factory
+ * (`__transportFactory`) for testing.
  */
 
 const HOST_ORIGIN = 'https://checkout.sunbay-dev.com';
 
-/** mock transport：记录 request、持有 on/onHello handler，可手动触发事件与握手。 */
+/** mock transport: records requests, holds on/onHello handlers, can trigger events and the handshake manually. */
 interface MockTransport extends InstanceTransport {
     requests: { name: CommandName; payload: unknown }[];
     requestImpl: (name: CommandName, payload: unknown) => Promise<unknown>;
@@ -32,7 +34,7 @@ interface MockTransport extends InstanceTransport {
     injectedRuntimeId: string | null;
 }
 
-/** 一个可用的 PublicSessionView 样例。 */
+/** A usable PublicSessionView sample. */
 function makeSession(): PublicSessionView {
     return {
         sessionId: 'sess_1',
@@ -52,7 +54,7 @@ function makeSession(): PublicSessionView {
     };
 }
 
-/** 默认 RuntimeHello（支持主版本 1）。 */
+/** Default RuntimeHello (supports major version 1). */
 function makeHello(): RuntimeHello {
     return {
         protocol: 'sunbay-checkout',
@@ -127,7 +129,7 @@ function createMockTransport(): MockTransport {
     return transport;
 }
 
-/** 启动 createCheckout 并在下一 tick 驱动 hello，返回实例与 mock。 */
+/** Start createCheckout and drive hello on the next tick, returning the instance and mock. */
 async function bootstrap(
     overrides?: (t: MockTransport) => void,
     createOpts?: { appearance?: Appearance }
@@ -140,7 +142,7 @@ async function bootstrap(
         appearance: createOpts?.appearance,
         __transportFactory: () => transport,
     });
-    // 等到 createHiddenIframe 已调用 & onHello 已注册后再触发握手。
+    // Wait until createHiddenIframe is called & onHello is registered before firing the handshake.
     await Promise.resolve();
     transport.fireHello(makeHello());
     const instance = await promise;
@@ -152,20 +154,20 @@ afterEach(() => {
 });
 
 describe('createCheckout', () => {
-    it('等到 hello + initialize 后 resolve 出实例', async () => {
+    it('resolves to an instance after hello + initialize', async () => {
         const { instance, transport } = await bootstrap();
         expect(instance).toBeInstanceOf(CheckoutInstance);
         expect(transport.createdIframe).toBe(true);
-        // 握手协商出的 runtimeId 被注入 transport（否则 main 端点会静默丢弃请求）。
+        // The negotiated runtimeId is injected into transport (otherwise the main endpoint silently drops requests).
         expect(transport.injectedRuntimeId).toBe('rt_1');
-        // 发过 initialize 命令。
+        // initialize command was sent.
         expect(transport.requests.some((r) => r.name === 'initialize')).toBe(true);
-        // 能读到初始化回来的 session。
+        // Can read the session returned by initialization.
         const session = await instance.getSession();
         expect(session.sessionId).toBe('sess_1');
     });
 
-    it('hello 超时（未握手）reject RUNTIME_LOAD_FAILED', async () => {
+    it('hello timeout (no handshake) rejects RUNTIME_LOAD_FAILED', async () => {
         vi.useFakeTimers();
         const transport = createMockTransport();
         const promise = createCheckout({
@@ -181,7 +183,7 @@ describe('createCheckout', () => {
         vi.useRealTimers();
     });
 
-    it('无共同主版本 reject PROTOCOL_UNSUPPORTED', async () => {
+    it('no common major version rejects PROTOCOL_UNSUPPORTED', async () => {
         const transport = createMockTransport();
         const promise = createCheckout({
             sessionId: 'sess_1',
@@ -196,8 +198,8 @@ describe('createCheckout', () => {
     });
 });
 
-describe('CheckoutInstance.create 互斥', () => {
-    it("create('card') 后再 create('cardNumber') 抛 ELEMENT_CONFLICT", async () => {
+describe('CheckoutInstance.create mutual exclusion', () => {
+    it("create('cardNumber') after create('card') throws ELEMENT_CONFLICT", async () => {
         const { instance } = await bootstrap();
         instance.create('card');
         expect(() => instance.create('cardNumber')).toThrowError(
@@ -205,7 +207,7 @@ describe('CheckoutInstance.create 互斥', () => {
         );
     });
 
-    it('重复 mode 地址抛 ELEMENT_CONFLICT', async () => {
+    it('duplicate mode address throws ELEMENT_CONFLICT', async () => {
         const { instance } = await bootstrap();
         instance.create('address', { mode: 'billing' });
         expect(() => instance.create('address', { mode: 'billing' })).toThrowError(
@@ -213,7 +215,7 @@ describe('CheckoutInstance.create 互斥', () => {
         );
     });
 
-    it('重复 expressCheckout 抛 ELEMENT_CONFLICT', async () => {
+    it('duplicate expressCheckout throws ELEMENT_CONFLICT', async () => {
         const { instance } = await bootstrap();
         instance.create('expressCheckout');
         expect(() => instance.create('expressCheckout')).toThrowError(
@@ -222,34 +224,34 @@ describe('CheckoutInstance.create 互斥', () => {
     });
 });
 
-describe('CheckoutInstance.create 销毁后释放互斥名额（可重建）', () => {
-    it("expressCheckout destroy 后可再 create（不抛 ELEMENT_CONFLICT）", async () => {
+describe('CheckoutInstance.create releases the mutual-exclusion slot after destroy (can recreate)', () => {
+    it('expressCheckout can be created again after destroy (does not throw ELEMENT_CONFLICT)', async () => {
         const { instance } = await bootstrap();
         const el = instance.create('expressCheckout');
         el.destroy();
-        // 释放名额后应能重建（如切换 buttonType/buttonHeight 需重建 iframe）。
+        // After releasing the slot it should be recreatable (e.g. switching buttonType/buttonHeight requires rebuilding the iframe).
         expect(() => instance.create('expressCheckout')).not.toThrow();
     });
 
-    it("combined card destroy 后可再 create，且互斥随之解除（可转拆分字段）", async () => {
+    it('combined card can be created again after destroy, and mutual exclusion is lifted (can switch to split fields)', async () => {
         const { instance } = await bootstrap();
         const card = instance.create('card');
         card.destroy();
-        // 释放名额后可重建同类单例。
+        // After releasing the slot the same singleton can be rebuilt.
         const card2 = instance.create('card');
-        // card 存在期间与拆分字段互斥。
+        // While card exists it is mutually exclusive with split fields.
         expect(() => instance.create('cardNumber')).toThrowError(
             expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
         );
-        // 销毁 card 后，card↔拆分字段互斥解除。
+        // After destroying card, the card↔split-field mutual exclusion is lifted.
         card2.destroy();
         expect(() => instance.create('cardNumber')).not.toThrow();
     });
 
-    it("拆分字段 destroy 后可再 create 同类型；未销毁时重复仍抛", async () => {
+    it('a split field can be created again after destroy; duplicate while not destroyed still throws', async () => {
         const { instance } = await bootstrap();
         const cn = instance.create('cardNumber');
-        // 未销毁时重复同类型仍冲突。
+        // Duplicate of the same type while not destroyed still conflicts.
         expect(() => instance.create('cardNumber')).toThrowError(
             expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
         );
@@ -257,12 +259,12 @@ describe('CheckoutInstance.create 销毁后释放互斥名额（可重建）', (
         expect(() => instance.create('cardNumber')).not.toThrow();
     });
 
-    it("address 同 mode destroy 后可再 create；不同 mode 始终并存", async () => {
+    it('address with the same mode can be created again after destroy; different modes always coexist', async () => {
         const { instance } = await bootstrap();
         const billing = instance.create('address', { mode: 'billing' });
-        // 不同 mode 并存不冲突。
+        // Different modes coexist without conflict.
         expect(() => instance.create('address', { mode: 'shipping' })).not.toThrow();
-        // 同 mode 未销毁仍冲突。
+        // Same mode while not destroyed still conflicts.
         expect(() => instance.create('address', { mode: 'billing' })).toThrowError(
             expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
         );
@@ -270,17 +272,17 @@ describe('CheckoutInstance.create 销毁后释放互斥名额（可重建）', (
         expect(() => instance.create('address', { mode: 'billing' })).not.toThrow();
     });
 
-    it("unmount 不释放名额（仍占位，语义不变）", async () => {
+    it('unmount does not release the slot (still occupied, semantics unchanged)', async () => {
         const { instance } = await bootstrap();
         const el = instance.create('expressCheckout');
         await el.unmount();
-        // unmount 保留句柄可 remount，仍占互斥名额。
+        // unmount keeps the handle for remount, still occupying the mutual-exclusion slot.
         expect(() => instance.create('expressCheckout')).toThrowError(
             expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
         );
     });
 
-    it("instance.destroy 多 element 时不报错，之后 create 抛 INSTANCE_DESTROYED", async () => {
+    it('instance.destroy with multiple elements does not error, then create throws INSTANCE_DESTROYED', async () => {
         const { instance } = await bootstrap();
         instance.create('expressCheckout');
         instance.create('cardNumber');
@@ -292,8 +294,8 @@ describe('CheckoutInstance.create 销毁后释放互斥名额（可重建）', (
     });
 });
 
-describe('CheckoutInstance colorScheme 透传', () => {
-    it("以 appearance.colorScheme='dark' 创建实例并 mount element → iframe src 含 colorScheme=dark", async () => {
+describe('CheckoutInstance colorScheme passthrough', () => {
+    it("create an instance with appearance.colorScheme='dark' and mount element → iframe src contains colorScheme=dark", async () => {
         const { instance } = await bootstrap(undefined, {
             appearance: { colorScheme: 'dark' },
         });
@@ -309,7 +311,7 @@ describe('CheckoutInstance colorScheme 透传', () => {
         document.body.innerHTML = '';
     });
 
-    it("updateCheckout({ appearance: { colorScheme: 'light' } }) 发 updateCheckout 命令且 payload 含该 colorScheme", async () => {
+    it("updateCheckout({ appearance: { colorScheme: 'light' } }) sends updateCheckout command and payload contains that colorScheme", async () => {
         const { instance, transport } = await bootstrap();
         const patch: { appearance: Appearance } = { appearance: { colorScheme: 'light' } };
         await instance.updateCheckout(patch);
@@ -319,8 +321,8 @@ describe('CheckoutInstance colorScheme 透传', () => {
     });
 });
 
-describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', () => {
-    /** 从 iframe src 的 query 解出 appearance 参数并 JSON 解码。 */
+describe('CheckoutInstance appearance variables/rules serialized into iframe src', () => {
+    /** Parse the appearance param from the iframe src query and JSON-decode it. */
     function parseAppearanceParam(src: string): unknown {
         const q = src.indexOf('?');
         const params = new URLSearchParams(q >= 0 ? src.slice(q) : '');
@@ -328,7 +330,7 @@ describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', 
         return raw === null ? undefined : JSON.parse(raw);
     }
 
-    it('带 variables + rules 的 createCheckout 后，element iframe src 含 &appearance= 且解码后含该 variables/rules', async () => {
+    it('after createCheckout with variables + rules, the element iframe src contains &appearance= and decodes to contain those variables/rules', async () => {
         const appearance: Appearance = {
             variables: { colorPrimary: '#ff6000', borderRadius: '8px' },
             rules: { input: { 'font-weight': 'bold' } },
@@ -343,7 +345,7 @@ describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', 
         void element.mount(container);
         const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
         expect(src).toContain('&appearance=');
-        // colorScheme 仍单独透传（不回退）。
+        // colorScheme is still passed through separately (no fallback).
         expect(src).toContain('colorScheme=dark');
 
         const decoded = parseAppearanceParam(src);
@@ -355,7 +357,7 @@ describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', 
         document.body.innerHTML = '';
     });
 
-    it('appearance 仅含 colorScheme（无 variables/rules）时不拼接 &appearance=（避免空串）', async () => {
+    it('does not append &appearance= when appearance only has colorScheme (no variables/rules) (avoid empty string)', async () => {
         const { instance } = await bootstrap(undefined, {
             appearance: { colorScheme: 'light' },
         });
@@ -374,10 +376,10 @@ describe('CheckoutInstance appearance variables/rules 序列化进 iframe src', 
 });
 
 describe('CheckoutInstance.confirm', () => {
-    it('在 paymentResult 事件到达后以 PaymentOutcome resolve', async () => {
+    it('resolves with a PaymentOutcome after the paymentResult event arrives', async () => {
         const { instance, transport } = await bootstrap();
         const promise = instance.confirm();
-        // 等 confirm 命令发出并拿到 accepted。
+        // Wait for the confirm command to be sent and get accepted.
         await Promise.resolve();
         await Promise.resolve();
         const confirmReq = transport.requests.find((r) => r.name === 'confirm');
@@ -392,7 +394,7 @@ describe('CheckoutInstance.confirm', () => {
         await expect(promise).resolves.toEqual(outcome);
     });
 
-    it('重复 confirm 抛 CHECKOUT_BUSY', async () => {
+    it('repeated confirm throws CHECKOUT_BUSY', async () => {
         const { instance } = await bootstrap();
         void instance.confirm();
         await Promise.resolve();
@@ -403,14 +405,14 @@ describe('CheckoutInstance.confirm', () => {
 });
 
 describe('CheckoutInstance.destroy', () => {
-    it('幂等，并发 destroy 命令', async () => {
+    it('idempotent, sends destroy command', async () => {
         const { instance, transport } = await bootstrap();
         instance.destroy();
         instance.destroy();
         expect(transport.destroyed).toBe(true);
     });
 
-    it('destroy 后迟到的 paymentResult 被忽略（不改写已结束 Promise）', async () => {
+    it('a late paymentResult after destroy is ignored (does not rewrite an already-settled Promise)', async () => {
         const { instance, transport } = await bootstrap();
         const promise = instance.confirm();
         await Promise.resolve();
@@ -418,7 +420,7 @@ describe('CheckoutInstance.destroy', () => {
         const confirmReq = transport.requests.find((r) => r.name === 'confirm');
         const operationId = (confirmReq!.payload as { operationId: string }).operationId;
 
-        // 先以一次结果兑现 confirm。
+        // First settle confirm with one result.
         const firstOutcome: PaymentOutcome = {
             status: 'succeeded',
             operationId,
@@ -427,7 +429,7 @@ describe('CheckoutInstance.destroy', () => {
         transport.emit('paymentResult', { operationId, method: 'card', outcome: firstOutcome });
         await expect(promise).resolves.toEqual(firstOutcome);
 
-        // destroy 后再来一条迟到结果，不得抛错、不得改写已结束 Promise。
+        // A late result after destroy must not throw, nor rewrite the already-settled Promise.
         instance.destroy();
         expect(() =>
             transport.emit('paymentResult', {
@@ -436,7 +438,7 @@ describe('CheckoutInstance.destroy', () => {
                 outcome: { status: 'failed', operationId, error: {} },
             })
         ).not.toThrow();
-        // 已结束 Promise 结果保持不变。
+        // The already-settled Promise result stays unchanged.
         await expect(promise).resolves.toEqual(firstOutcome);
     });
 });

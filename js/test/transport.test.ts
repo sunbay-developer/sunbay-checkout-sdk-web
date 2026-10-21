@@ -3,44 +3,44 @@ import { MainFrameTransport } from '../src/transport/MainFrameTransport';
 import { ErrorCode, type CheckoutError, type Envelope } from '@sunbay/checkout-sdk-protocol';
 
 /**
- * transport 契约测试（真源：js/src/transport/MainFrameTransport）。
+ * transport contract tests (source of truth: js/src/transport/MainFrameTransport).
  *
- * 环境：jsdom。用 mock 的 iframe.contentWindow.postMessage 捕获出站信封，
- * 用 window.dispatchEvent(new MessageEvent('message', ...)) 模拟入站回包。
+ * Environment: jsdom. Outbound envelopes are captured via a mocked iframe.contentWindow.postMessage,
+ * inbound replies are simulated with window.dispatchEvent(new MessageEvent('message', ...)).
  */
 
 const HOST_ORIGIN = 'https://checkout.sunbay-dev.com';
 const CHECKOUT_ID = 'co_1';
 const RUNTIME_ID = 'rt_1';
 
-/** 捕获 postMessage 的出站字符串信封。 */
+/** Captures outbound string envelopes from postMessage. */
 let sent: string[];
 
 /**
- * 替换 iframe.contentWindow.postMessage，记录出站信封。
- * createHiddenIframe 真实创建 iframe（jsdom 下 contentWindow 存在）。
+ * Replace iframe.contentWindow.postMessage to record outbound envelopes.
+ * createHiddenIframe truly creates an iframe (contentWindow exists under jsdom).
  */
 function patchIframeContentWindow(iframe: HTMLIFrameElement): void {
     const cw = iframe.contentWindow;
     if (!cw) {
-        throw new Error('jsdom iframe.contentWindow 为空');
+        throw new Error('jsdom iframe.contentWindow is null');
     }
     vi.spyOn(cw, 'postMessage').mockImplementation(((message: unknown) => {
         sent.push(message as string);
     }) as typeof cw.postMessage);
 }
 
-/** 解析最近一次出站 request 信封。 */
+/** Parse the most recent outbound request envelope. */
 function lastRequest(): Extract<Envelope, { kind: 'request' }> {
     const wire = sent[sent.length - 1];
     const env = JSON.parse(wire) as Envelope;
     if (env.kind !== 'request') {
-        throw new Error('最近一次出站信封不是 request');
+        throw new Error('the most recent outbound envelope is not a request');
     }
     return env;
 }
 
-/** 构造一个成功 response 信封字符串。 */
+/** Build a successful response envelope string. */
 function okResponseWire(requestId: string, data: unknown): string {
     const env: Envelope = {
         protocol: 'sunbay-checkout',
@@ -55,7 +55,7 @@ function okResponseWire(requestId: string, data: unknown): string {
     return JSON.stringify(env);
 }
 
-/** 构造一个失败 response 信封字符串。 */
+/** Build a failed response envelope string. */
 function errResponseWire(requestId: string, error: CheckoutError): string {
     const env: Envelope = {
         protocol: 'sunbay-checkout',
@@ -70,7 +70,7 @@ function errResponseWire(requestId: string, error: CheckoutError): string {
     return JSON.stringify(env);
 }
 
-/** 构造一个 event 信封字符串。 */
+/** Build an event envelope string. */
 function eventWire(name: string, payload: unknown, checkoutId = CHECKOUT_ID): string {
     const env: Envelope = {
         protocol: 'sunbay-checkout',
@@ -85,7 +85,7 @@ function eventWire(name: string, payload: unknown, checkoutId = CHECKOUT_ID): st
     return JSON.stringify(env);
 }
 
-/** 模拟从托管页面向 window 投递一条 message。 */
+/** Simulate delivering a message to window from the hosted page. */
 function deliver(data: string, origin = HOST_ORIGIN): void {
     window.dispatchEvent(new MessageEvent('message', { data, origin }));
 }
@@ -109,15 +109,16 @@ describe('MainFrameTransport', () => {
         vi.restoreAllMocks();
     });
 
-    it('createHiddenIframe 生成隐藏 0 尺寸 iframe 并挂到 body，src 带 checkoutId', () => {
+    it('createHiddenIframe creates a hidden zero-size iframe attached to body, src carries checkoutId', () => {
         const iframe = document.body.querySelector('iframe');
         expect(iframe).not.toBeNull();
         expect(iframe!.src).toBe(`${HOST_ORIGIN}/sdk/main?checkoutId=${CHECKOUT_ID}`);
     });
 
-    it('request 发出 request 信封：含 name/payload/requestId，postMessage 到 iframe', () => {
-        // 该用例只检查出站信封，不等待响应；attach 一个 catch 吞掉
-        // afterEach destroy() 带来的 INSTANCE_DESTROYED reject，避免未处理拒绝。
+    it('request sends a request envelope: contains name/payload/requestId, postMessage to iframe', () => {
+        // This case only checks the outbound envelope and does not await a response; attach a catch
+        // to swallow the INSTANCE_DESTROYED reject from afterEach destroy(), avoiding unhandled
+        // rejection.
         transport.request('getSession', {}).catch(() => undefined);
         const req = lastRequest();
         expect(req.name).toBe('getSession');
@@ -126,26 +127,27 @@ describe('MainFrameTransport', () => {
         expect(req.requestId.length).toBeGreaterThan(0);
     });
 
-    it('未注入 runtimeId 时出站 request 信封 runtimeId 为空串', () => {
+    it('outbound request envelope runtimeId is an empty string when runtimeId is not injected', () => {
         transport.request('getSession', {}).catch(() => undefined);
         expect(lastRequest().runtimeId).toBe('');
     });
 
-    it('setRuntimeId 后出站 request 信封携带协商 runtimeId', () => {
-        // 回归：runtimeId 握手不回填会导致 main 端点静默丢弃请求 → initialize 超时。
+    it('outbound request envelope carries the negotiated runtimeId after setRuntimeId', () => {
+        // Regression: not backfilling the runtimeId handshake causes the main endpoint to silently
+        // drop requests → initialize times out.
         transport.setRuntimeId(RUNTIME_ID);
         transport.request('initialize', { sessionId: 'sess_1' }).catch(() => undefined);
         expect(lastRequest().runtimeId).toBe(RUNTIME_ID);
     });
 
-    it('回 response ok 使 Promise resolve，返回 data', async () => {
+    it('response ok resolves the Promise and returns data', async () => {
         const p = transport.request('getSession', {});
         const req = lastRequest();
         deliver(okResponseWire(req.requestId, { sessionId: 'sess_1' }));
         await expect(p).resolves.toEqual({ sessionId: 'sess_1' });
     });
 
-    it('回 response ok:false 使其 reject 带 CheckoutError', async () => {
+    it('response ok:false rejects it with a CheckoutError', async () => {
         const p = transport.request('confirm', { operationId: 'op_1' });
         const req = lastRequest();
         const error: CheckoutError = {
@@ -158,7 +160,7 @@ describe('MainFrameTransport', () => {
         await expect(p).rejects.toMatchObject({ code: ErrorCode.CHECKOUT_BUSY });
     });
 
-    it('超时 reject REQUEST_TIMEOUT（普通命令 10s）', async () => {
+    it('timeout rejects REQUEST_TIMEOUT (normal command 10s)', async () => {
         vi.useFakeTimers();
         const p = transport.request('getSession', {});
         const assertion = expect(p).rejects.toMatchObject({
@@ -168,24 +170,24 @@ describe('MainFrameTransport', () => {
         await assertion;
     });
 
-    it('initialize 默认超时 30s（10s 不触发，30s 触发）', async () => {
+    it('initialize default timeout 30s (not triggered at 10s, triggered at 30s)', async () => {
         vi.useFakeTimers();
         const p = transport.request('initialize', { sessionId: 'sess_1' });
         const assertion = expect(p).rejects.toMatchObject({
             code: ErrorCode.REQUEST_TIMEOUT,
         });
-        // 10s 时仍未决（无 unhandled rejection）
+        // Still pending at 10s (no unhandled rejection)
         await vi.advanceTimersByTimeAsync(10_000);
         await vi.advanceTimersByTimeAsync(20_000);
         await assertion;
     });
 
-    it('错误 origin 的 message 被忽略（request 不 resolve）', async () => {
+    it('message with wrong origin is ignored (request does not resolve)', async () => {
         vi.useFakeTimers();
         const p = transport.request('getSession', {});
         const req = lastRequest();
         deliver(okResponseWire(req.requestId, { sessionId: 'sess_1' }), 'https://evil.example');
-        // 错误 origin 被丢弃 → 最终超时 reject
+        // Wrong origin is dropped → eventually times out and rejects
         const assertion = expect(p).rejects.toMatchObject({
             code: ErrorCode.REQUEST_TIMEOUT,
         });
@@ -193,7 +195,7 @@ describe('MainFrameTransport', () => {
         await assertion;
     });
 
-    it('checkoutId 不匹配的 message 被忽略', async () => {
+    it('message with mismatched checkoutId is ignored', async () => {
         vi.useFakeTimers();
         const p = transport.request('getSession', {});
         const req = lastRequest();
@@ -215,7 +217,7 @@ describe('MainFrameTransport', () => {
         await assertion;
     });
 
-    it('destroy() 后未决 request reject INSTANCE_DESTROYED', async () => {
+    it('pending request rejects INSTANCE_DESTROYED after destroy()', async () => {
         const p = transport.request('getSession', {});
         const assertion = expect(p).rejects.toMatchObject({
             code: ErrorCode.INSTANCE_DESTROYED,
@@ -224,9 +226,10 @@ describe('MainFrameTransport', () => {
         await assertion;
     });
 
-    it('destroy() 后迟到的同 requestId ok response 被忽略，终态仍为 rejected(INSTANCE_DESTROYED)', async () => {
-        // 回归：Review Focus“销毁后迟到消息被忽略”。
-        // 先 .catch 捕获防止 unhandled rejection；并记录终态以断言绝不被篡改为 resolve。
+    it('a late ok response with the same requestId after destroy() is ignored, terminal state stays rejected(INSTANCE_DESTROYED)', async () => {
+        // Regression: Review Focus "late messages after destroy are ignored".
+        // First .catch to prevent unhandled rejection; record the terminal state to assert it is
+        // never tampered to resolve.
         const p = transport.request('getSession', {});
         const req = lastRequest();
 
@@ -243,40 +246,40 @@ describe('MainFrameTransport', () => {
             }
         );
 
-        // destroy() → Promise 以 INSTANCE_DESTROYED reject。
+        // destroy() → Promise rejects with INSTANCE_DESTROYED.
         transport.destroy();
         await observed;
         expect(settled).toBe('rejected');
         expect(settledReason).toMatchObject({ code: ErrorCode.INSTANCE_DESTROYED });
 
-        // 迟到：用相同 requestId 投递一个 ok response 信封。
-        // destroyed 守卫 + pending 已清 → 不应抛错，也不应产生额外 resolve。
+        // Late: deliver an ok response envelope with the same requestId.
+        // destroyed guard + pending already cleared → should not throw, nor produce an extra resolve.
         expect(() => deliver(okResponseWire(req.requestId, { sessionId: 'late' }))).not.toThrow();
 
-        // 让微任务队列充分推进，确保没有迟到的 settle 改变终态。
+        // Let the microtask queue advance fully to ensure no late settle changes the terminal state.
         await Promise.resolve();
         await Promise.resolve();
 
-        // 终态不变：仍为 rejected(INSTANCE_DESTROYED)，绝未被篡改为 resolve。
+        // Terminal state unchanged: still rejected(INSTANCE_DESTROYED), never tampered to resolve.
         expect(settled).toBe('rejected');
         expect(settledReason).toMatchObject({ code: ErrorCode.INSTANCE_DESTROYED });
         await expect(p).rejects.toMatchObject({ code: ErrorCode.INSTANCE_DESTROYED });
     });
 
-    it('destroy() 移除 iframe', () => {
+    it('destroy() removes the iframe', () => {
         expect(document.body.querySelector('iframe')).not.toBeNull();
         transport.destroy();
         expect(document.body.querySelector('iframe')).toBeNull();
     });
 
-    it('on 注册的 event handler 收到 kind:event 信封的 payload', () => {
+    it('on-registered event handler receives the payload of a kind:event envelope', () => {
         const handler = vi.fn();
         transport.on('ready', handler);
         deliver(eventWire('ready', { elementId: 'el_1' }));
         expect(handler).toHaveBeenCalledWith({ elementId: 'el_1' });
     });
 
-    it('off 注销后不再收到 event', () => {
+    it('no longer receives events after off deregisters', () => {
         const handler = vi.fn();
         transport.on('change', handler);
         transport.off('change', handler);
@@ -284,21 +287,21 @@ describe('MainFrameTransport', () => {
         expect(handler).not.toHaveBeenCalled();
     });
 
-    it('event 的 checkoutId 不匹配时不分发', () => {
+    it('does not dispatch when event checkoutId does not match', () => {
         const handler = vi.fn();
         transport.on('ready', handler);
         deliver(eventWire('ready', { elementId: 'el_1' }, 'co_OTHER'));
         expect(handler).not.toHaveBeenCalled();
     });
 
-    it('relay：收 element-online → 向 main 与来源 Element iframe 各 transfer 一个 port', () => {
-        // 捕获一次 postMessage 调用的记录（含 transfer 参数）。
+    it('relay: on element-online → transfer one port to each of main and the source Element iframe', () => {
+        // Capture the record of each postMessage call (including the transfer argument).
         interface PostCall {
             msg: unknown;
             origin: string | undefined;
             ports: readonly MessagePort[] | undefined;
         }
-        // main iframe 的 postMessage 记录。beforeEach 已 createHiddenIframe。
+        // main iframe's postMessage records. beforeEach already called createHiddenIframe.
         const mainWin = transport.createHiddenIframe().contentWindow as Window;
         const mainCalls: PostCall[] = [];
         vi.spyOn(mainWin, 'postMessage').mockImplementation(((
@@ -309,7 +312,7 @@ describe('MainFrameTransport', () => {
             mainCalls.push({ msg, origin, ports });
         }) as unknown as typeof mainWin.postMessage);
 
-        // 模拟发起 element-online 的 Element iframe window（event.source）。
+        // Simulate the Element iframe window (event.source) that initiates element-online.
         const elementCalls: PostCall[] = [];
         const elementWin = {
             postMessage: (msg: unknown, origin?: string, ports?: readonly MessagePort[]) => {
@@ -325,7 +328,7 @@ describe('MainFrameTransport', () => {
             })
         );
 
-        // main 侧收到 relay-port + 1 个 port，targetOrigin=hostOrigin。
+        // main side receives relay-port + 1 port, targetOrigin=hostOrigin.
         expect(mainCalls).toHaveLength(1);
         expect(mainCalls[0].msg).toMatchObject({
             kind: 'relay-port',
@@ -335,17 +338,17 @@ describe('MainFrameTransport', () => {
         expect(mainCalls[0].origin).toBe(HOST_ORIGIN);
         expect(mainCalls[0].ports).toHaveLength(1);
 
-        // Element iframe 侧同样收到 relay-port + 1 个 port。
+        // Element iframe side also receives relay-port + 1 port.
         expect(elementCalls).toHaveLength(1);
         expect(elementCalls[0].msg).toMatchObject({ fieldType: 'cardNumber' });
         expect(elementCalls[0].origin).toBe(HOST_ORIGIN);
         expect(elementCalls[0].ports).toHaveLength(1);
 
-        // main 与 Element 拿到的是同一 channel 的两个不同 port。
+        // main and Element get two different ports of the same channel.
         expect(mainCalls[0].ports?.[0]).not.toBe(elementCalls[0].ports?.[0]);
     });
 
-    it('relay：checkoutId 不匹配的 element-online 不分发 port', () => {
+    it('relay: element-online with mismatched checkoutId does not dispatch a port', () => {
         const mainWin = transport.createHiddenIframe().contentWindow as Window;
         const spy = vi
             .spyOn(mainWin, 'postMessage')

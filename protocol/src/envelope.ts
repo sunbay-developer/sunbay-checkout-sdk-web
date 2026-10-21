@@ -1,35 +1,37 @@
 /**
- * 信封与握手契约（spec 5.1，真源）。
+ * Envelope and handshake contract (spec 5.1, source of truth).
  *
- * 协议名 `sunbay-checkout`，`major = 1`。与现有 Native Bridge `{v:1,type,...}`
- * 是不同协议，数字相同不代表兼容。
+ * Protocol name `sunbay-checkout`, `major = 1`. This is a different protocol from the existing
+ * Native Bridge `{v:1,type,...}`; identical numbers do not imply compatibility.
  *
- * `encodeEnvelope`/`decodeEnvelope`：JSON 序列化 + 最小运行时结构校验
- * （校验 protocol/major/kind/必填字段），非法抛错。解码器**不**校验 request.name
- * 是否为已知 CommandName —— 未知 name 仍解为 kind==='request'，由调用方拒绝。
+ * `encodeEnvelope`/`decodeEnvelope`: JSON serialization + minimal runtime structural validation
+ * (validates protocol/major/kind/required fields), throwing on invalid input. The decoder does
+ * **not** validate whether request.name is a known CommandName — an unknown name is still decoded
+ * as kind==='request' and rejected by the caller.
  */
 
 import type { CheckoutError } from './types';
 
-/** 协议名常量。 */
+/** Protocol name constant. */
 export const PROTOCOL_NAME = 'sunbay-checkout' as const;
-/** 当前主版本。 */
+/** Current major version. */
 export const PROTOCOL_MAJOR = 1 as const;
 
 /**
- * 握手消息（spec 5.1）。main iframe 加载后先广播，此时尚无 checkoutId。
+ * Handshake message (spec 5.1). Broadcast first after the main iframe loads, when there is no
+ * checkoutId yet.
  */
 export type RuntimeHello = {
     protocol: 'sunbay-checkout';
     kind: 'hello';
     runtimeId: string;
     supportedMajorVersions: number[];
-    /** 首期：['card','splitCard','address','express','paymentMethodFilter']。 */
+    /** First phase: ['card','splitCard','address','express','paymentMethodFilter']. */
     capabilities: string[];
 };
 
 /**
- * 初始化后的公共信封（spec 5.1）。
+ * Public envelope after initialization (spec 5.1).
  */
 export type Envelope = {
     protocol: 'sunbay-checkout';
@@ -44,10 +46,10 @@ export type Envelope = {
     | { kind: 'event'; eventId: string; name: string; operationId?: string; payload: unknown }
 );
 
-/** 合法 kind 集合。 */
+/** Set of valid kinds. */
 const ENVELOPE_KINDS = ['request', 'response', 'event'] as const;
 
-/** 协议校验失败错误。 */
+/** Protocol validation failure error. */
 export class EnvelopeDecodeError extends Error {
     constructor(message: string) {
         super(message);
@@ -66,10 +68,10 @@ function assertString(obj: Record<string, unknown>, key: string): void {
 }
 
 /**
- * 将信封序列化为线缆字符串（JSON）。
+ * Serialize an envelope into a wire string (JSON).
  *
- * @param envelope 待发送的信封
- * @returns JSON 字符串
+ * @param envelope The envelope to send
+ * @returns JSON string
  * @example
  * const wire = encodeEnvelope({ protocol: 'sunbay-checkout', major: 1, ... });
  */
@@ -78,14 +80,14 @@ export function encodeEnvelope(envelope: Envelope): string {
 }
 
 /**
- * 解析并最小结构校验信封。非法（缺 protocol、错 major、非法 kind、缺必填字段、
- * 非 JSON）一律抛 {@link EnvelopeDecodeError}。
+ * Parse and minimally structurally validate an envelope. Invalid input (missing protocol, wrong
+ * major, invalid kind, missing required fields, non-JSON) always throws {@link EnvelopeDecodeError}.
  *
- * 注意：解码器不校验 request.name 是否为已知命令 —— 未知 name 仍解为
- * kind==='request'，交由调用方（如 Orchestrator）拒绝。
+ * Note: the decoder does not validate whether request.name is a known command — an unknown name is
+ * still decoded as kind==='request' and left for the caller (e.g. the Orchestrator) to reject.
  *
- * @param wire 线缆字符串
- * @returns 已校验结构的信封
+ * @param wire The wire string
+ * @returns The structurally validated envelope
  * @example
  * const env = decodeEnvelope(wire);
  * if (env.kind === 'request') { ... }
@@ -164,6 +166,6 @@ export function decodeEnvelope(wire: string): Envelope {
         }
     }
 
-    // 结构已校验，确认为 Envelope 形状。
+    // Structure validated; confirmed to be an Envelope shape.
     return parsed as unknown as Envelope;
 }

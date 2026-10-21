@@ -1,7 +1,8 @@
 /**
- * 命令契约（商户 SDK → main，spec 5.2 表，真源）。
+ * Command contract (merchant SDK → main, spec 5.2 table, source of truth).
  *
- * 每命令的请求/响应类型在此定义；跨通道只传 JSON 可序列化数据。
+ * The request/response types for each command are defined here; only JSON-serializable data is sent
+ * across the channel.
  */
 
 import type {
@@ -14,7 +15,7 @@ import type {
     TxnStatus,
 } from './types';
 
-/** 全部命令名（spec 5.2）。 */
+/** All command names (spec 5.2). */
 export type CommandName =
     | 'initialize'
     | 'createElement'
@@ -30,7 +31,7 @@ export type CommandName =
     | 'confirm'
     | 'destroy';
 
-/** 已知命令名集合（供调用方校验 request.name 是否受支持）。 */
+/** Set of known command names (for callers to validate whether request.name is supported). */
 export const COMMAND_NAMES: readonly CommandName[] = [
     'initialize',
     'createElement',
@@ -47,7 +48,7 @@ export const COMMAND_NAMES: readonly CommandName[] = [
     'destroy',
 ];
 
-/** 判断字符串是否为已知命令名。 */
+/** Determine whether a string is a known command name. */
 export function isCommandName(name: string): name is CommandName {
     return (COMMAND_NAMES as readonly string[]).includes(name);
 }
@@ -94,7 +95,7 @@ export interface DestroyElementResp {
     released: true;
 }
 
-// --- focus / blur / clear（仅输入类 Element）---
+// --- focus / blur / clear (input-type Elements only) ---
 export interface ElementActionReq {
     elementId: string;
 }
@@ -103,7 +104,7 @@ export interface ElementActionResp {
     done: true;
 }
 
-// --- updateCheckout（不改会话/金额）---
+// --- updateCheckout (does not change session/amount) ---
 export interface UpdateCheckoutReq {
     locale?: string;
     appearance?: Appearance;
@@ -116,14 +117,14 @@ export interface UpdateCheckoutResp {
 export type GetSessionReq = Record<string, never>;
 export type GetSessionResp = PublicSessionView;
 
-// --- getPaymentStatus（原样返回 TxnStatus，不转义）---
+// --- getPaymentStatus (returns TxnStatus verbatim, no translation) ---
 export type GetPaymentStatusReq = Record<string, never>;
 export interface GetPaymentStatusResp {
     txnStatus: TxnStatus;
     txnId?: string;
 }
 
-// --- confirm（仅表示开始执行）---
+// --- confirm (only indicates that execution has started) ---
 export interface ConfirmReq {
     operationId: string;
     billingAddress?: AddressInfo;
@@ -142,7 +143,7 @@ export interface DestroyResp {
     released: true;
 }
 
-/** 命令名 → 请求载荷映射。 */
+/** Command name → request payload mapping. */
 export interface CommandRequestMap {
     initialize: InitializeReq;
     createElement: CreateElementReq;
@@ -159,7 +160,7 @@ export interface CommandRequestMap {
     destroy: DestroyReq;
 }
 
-/** 命令名 → 成功响应载荷映射。 */
+/** Command name → success response payload mapping. */
 export interface CommandResponseMap {
     initialize: InitializeResp;
     createElement: CreateElementResp;

@@ -9,28 +9,29 @@ import {
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
- * CheckoutElement 契约测试（真源：js/src/Element）。
+ * CheckoutElement contract tests (source of truth: js/src/Element).
  *
- * 环境：jsdom。transport 为 mock（记录 request 调用、驱动 on 注册的事件 handler）。
- * CheckoutElement 独立测试时通过构造参注入 mock transport、elementId、type、hostOrigin。
+ * Environment: jsdom. transport is a mock (records request calls, drives on-registered event
+ * handlers). When testing CheckoutElement in isolation, a mock transport, elementId, type and
+ * hostOrigin are injected via constructor params.
  */
 
 const HOST_ORIGIN = 'https://checkout.sunbay-dev.com';
 const CHECKOUT_ID = 'co_test_1';
 
-/** 事件 handler 集合（按事件名）。 */
+/** Set of event handlers (keyed by event name). */
 type Handlers = Map<string, Set<(payload: unknown) => void>>;
 
-/** mock transport：记录 request、持有 on 注册的 handler，可手动触发事件。 */
+/** mock transport: records requests, holds on-registered handlers, can trigger events manually. */
 interface MockTransport {
     requests: { name: CommandName; payload: unknown }[];
     handlers: Handlers;
-    /** request 行为注入：按命令名返回 resolve 或 reject。 */
+    /** request behavior injection: resolve or reject by command name. */
     requestImpl: (name: CommandName, payload: unknown) => Promise<unknown>;
     request: (name: CommandName, payload: unknown) => Promise<unknown>;
     on: (event: string, handler: (payload: unknown) => void) => void;
     off: (event: string, handler: (payload: unknown) => void) => void;
-    /** 测试辅助：向某事件名的全部 handler 分发 payload。 */
+    /** Test helper: dispatch a payload to all handlers of a given event name. */
     emit: (event: string, payload: unknown) => void;
 }
 
@@ -68,7 +69,7 @@ function createMockTransport(): MockTransport {
     return transport;
 }
 
-/** 构造一个待测 Element。 */
+/** Construct an Element under test. */
 function makeElement(
     transport: MockTransport,
     type: ElementType,
@@ -89,7 +90,7 @@ function makeElement(
     });
 }
 
-/** 创建一个空的唯一容器并挂到 body。 */
+/** Create an empty unique container and attach it to body. */
 function makeContainer(id: string): HTMLElement {
     const el = document.createElement('div');
     el.id = id;
@@ -97,14 +98,14 @@ function makeContainer(id: string): HTMLElement {
     return el;
 }
 
-/** 输入类动作方法签名（focus/blur/clear 均返回 Promise<void>）。 */
+/** Input action method signature (focus/blur/clear all return Promise<void>). */
 type InputAction = () => Promise<void>;
 
-/** 断言并取出某个输入类动作方法（类型安全，避免可选链导致 tsc 报 possibly undefined）。 */
+/** Assert and extract an input action method (type-safe, avoids tsc "possibly undefined" from optional chaining). */
 function inputAction(el: CheckoutElement, name: 'focus' | 'blur' | 'clear'): InputAction {
     const fn = el[name];
     if (typeof fn !== 'function') {
-        throw new Error(`${name} 未定义`);
+        throw new Error(`${name} is undefined`);
     }
     return fn.bind(el);
 }
@@ -119,27 +120,27 @@ afterEach(() => {
 });
 
 describe('CheckoutElement.mount', () => {
-    it('在容器插入一个可见 iframe 并在 elementReady 后 resolve', async () => {
+    it('inserts a visible iframe into the container and resolves after elementReady', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'cardNumber', 'el_card');
         const container = makeContainer('mount-target');
 
         const mounted = el.mount('#mount-target');
-        // mount 期间应已插入 iframe
+        // The iframe should already be inserted during mount
         const iframe = container.querySelector('iframe');
         expect(iframe).not.toBeNull();
         const src = iframe?.getAttribute('src') ?? '';
         expect(src).toContain(`${HOST_ORIGIN}/sdk/field/cardNumber?`);
         expect(src).toContain(`checkoutId=${CHECKOUT_ID}`);
-        // 已发 createElement 命令
+        // createElement command already sent
         expect(transport.requests.some((r) => r.name === 'createElement')).toBe(true);
 
-        // 触发对应 elementId 的 elementReady，mount 应 resolve
+        // Fire elementReady for the matching elementId, mount should resolve
         transport.emit('elementReady', { elementId: 'el_card' });
         await expect(mounted).resolves.toBeUndefined();
     });
 
-    it('card/address/express 使用 /sdk/element/<type> 路径', async () => {
+    it('card/address/express use the /sdk/element/<type> path', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t2');
@@ -152,7 +153,7 @@ describe('CheckoutElement.mount', () => {
         await mounted;
     });
 
-    it('容器非空时 reject INVALID_OPTIONS', async () => {
+    it('rejects INVALID_OPTIONS when the container is non-empty', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t3');
@@ -162,7 +163,7 @@ describe('CheckoutElement.mount', () => {
         });
     });
 
-    it('选择器无法唯一定位容器时 reject INVALID_OPTIONS', async () => {
+    it('rejects INVALID_OPTIONS when the selector cannot uniquely locate a container', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         await expect(el.mount('#does-not-exist')).rejects.toMatchObject({
@@ -170,7 +171,7 @@ describe('CheckoutElement.mount', () => {
         });
     });
 
-    it('重复 mount reject ELEMENT_CONFLICT', async () => {
+    it('repeated mount rejects ELEMENT_CONFLICT', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t4');
@@ -184,7 +185,7 @@ describe('CheckoutElement.mount', () => {
         });
     });
 
-    it('loadError 事件使 mount reject 并移除 iframe 节点', async () => {
+    it('loadError event makes mount reject and removes the iframe node', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t5');
@@ -203,8 +204,8 @@ describe('CheckoutElement.mount', () => {
     });
 });
 
-describe('CheckoutElement colorScheme 透传 iframe src', () => {
-    it('提供 colorScheme 时 iframe src 带 colorScheme=<值>', () => {
+describe('CheckoutElement colorScheme passthrough to iframe src', () => {
+    it('iframe src carries colorScheme=<value> when colorScheme is provided', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_cs', 'dark');
         const container = makeContainer('t-cs-dark');
@@ -213,7 +214,7 @@ describe('CheckoutElement colorScheme 透传 iframe src', () => {
         expect(src).toContain('colorScheme=dark');
     });
 
-    it("colorScheme='auto' 同样透传", () => {
+    it("colorScheme='auto' is passed through too", () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'cardNumber', 'el_cs2', 'auto');
         const container = makeContainer('t-cs-auto');
@@ -222,7 +223,7 @@ describe('CheckoutElement colorScheme 透传 iframe src', () => {
         expect(src).toContain('colorScheme=auto');
     });
 
-    it('未提供 colorScheme 时 iframe src 不含 colorScheme 参数', () => {
+    it('iframe src does not contain the colorScheme param when colorScheme is not provided', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_cs3');
         const container = makeContainer('t-cs-none');
@@ -232,8 +233,8 @@ describe('CheckoutElement colorScheme 透传 iframe src', () => {
     });
 });
 
-describe('CheckoutElement appearance 透传 iframe src', () => {
-    it('提供含 variables 的 appearance 时 iframe src 带 &appearance=（解码含该 variables）', () => {
+describe('CheckoutElement appearance passthrough to iframe src', () => {
+    it('iframe src carries &appearance= when appearance with variables is provided (decoded contains those variables)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_ap', undefined, {
             variables: { colorPrimary: '#ff6000' },
@@ -247,7 +248,7 @@ describe('CheckoutElement appearance 透传 iframe src', () => {
         expect(decoded).toMatchObject({ variables: { colorPrimary: '#ff6000' } });
     });
 
-    it('提供含 rules 的 appearance 时 iframe src 带 &appearance=（解码含该 rules）', () => {
+    it('iframe src carries &appearance= when appearance with rules is provided (decoded contains those rules)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'cardNumber', 'el_ap2', undefined, {
             rules: { input: { 'font-weight': 'bold' } },
@@ -261,7 +262,7 @@ describe('CheckoutElement appearance 透传 iframe src', () => {
         expect(decoded).toMatchObject({ rules: { input: { 'font-weight': 'bold' } } });
     });
 
-    it('appearance 仅含 colorScheme（无 variables/rules）时不拼接 appearance=（避免空串）', () => {
+    it('does not append appearance= when appearance only has colorScheme (no variables/rules) (avoid empty string)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_ap3', 'dark', {
             colorScheme: 'dark',
@@ -273,7 +274,7 @@ describe('CheckoutElement appearance 透传 iframe src', () => {
         expect(src).toContain('colorScheme=dark');
     });
 
-    it('未提供 appearance 时 iframe src 不含 appearance 参数', () => {
+    it('iframe src does not contain the appearance param when appearance is not provided', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_ap4');
         const container = makeContainer('t-ap-none');
@@ -283,8 +284,8 @@ describe('CheckoutElement appearance 透传 iframe src', () => {
     });
 });
 
-describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
-    it('buttonHeight 拼进 &buttonHeight=<n>', () => {
+describe('CheckoutElement expressCheckout options passthrough to iframe src', () => {
+    it('buttonHeight is appended as &buttonHeight=<n>', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_bh', undefined, undefined, {
             buttonHeight: 52,
@@ -296,7 +297,7 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         expect(params.get('buttonHeight')).toBe('52');
     });
 
-    it('applePay 对象形态的 buttonType 拼进 &applePayButtonType=<v>', () => {
+    it('applePay object-form buttonType is appended as &applePayButtonType=<v>', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_abt', undefined, undefined, {
             paymentMethods: { applePay: { buttonType: 'buy' } },
@@ -308,7 +309,7 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         expect(params.get('applePayButtonType')).toBe('buy');
     });
 
-    it('googlePay 对象形态的 buttonType 拼进 &googlePayButtonType=<v>', () => {
+    it('googlePay object-form buttonType is appended as &googlePayButtonType=<v>', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_gbt', undefined, undefined, {
             paymentMethods: { googlePay: { buttonType: 'checkout' } },
@@ -320,7 +321,7 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         expect(params.get('googlePayButtonType')).toBe('checkout');
     });
 
-    it('钱包为布尔开关(无对象)时不拼 buttonType 参数', () => {
+    it('does not append buttonType param when wallet is a boolean toggle (no object)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_bool', undefined, undefined, {
             paymentMethods: { applePay: false, googlePay: true },
@@ -332,7 +333,7 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         expect(src).not.toContain('googlePayButtonType');
     });
 
-    it('无 express options 时不拼 buttonHeight / buttonType 参数', () => {
+    it('does not append buttonHeight / buttonType params when there are no express options', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_none');
         const container = makeContainer('t-express-opts-none');
@@ -342,7 +343,7 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         expect(src).not.toContain('ButtonType');
     });
 
-    it('不破坏现有钱包开关 query（applePay/googlePay 开关语义保持，对象形态不拼布尔开关串）', () => {
+    it('does not break existing wallet toggle query (applePay/googlePay toggle semantics preserved, object form does not append boolean toggle string)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_mix', undefined, undefined, {
             paymentMethods: {
@@ -357,13 +358,13 @@ describe('CheckoutElement expressCheckout options 透传 iframe src', () => {
         const params = new URLSearchParams(src.slice(src.indexOf('?')));
         expect(params.get('applePayButtonType')).toBe('donate');
         expect(params.get('buttonHeight')).toBe('30');
-        // 显式关闭的钱包仍以布尔开关下发
+        // An explicitly disabled wallet is still sent as a boolean toggle
         expect(params.get('googlePay')).toBe('false');
     });
 });
 
 describe('CheckoutElement.unmount', () => {
-    it('幂等；发 destroyElement 并移除 iframe；保留句柄', async () => {
+    it('idempotent; sends destroyElement and removes iframe; keeps the handle', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t6');
@@ -374,19 +375,19 @@ describe('CheckoutElement.unmount', () => {
         await el.unmount();
         expect(transport.requests.some((r) => r.name === 'destroyElement')).toBe(true);
         expect(container.querySelector('iframe')).toBeNull();
-        // 幂等：再次 unmount 不抛
+        // Idempotent: unmount again does not throw
         await expect(el.unmount()).resolves.toBeUndefined();
-        // 句柄仍可用
+        // Handle is still usable
         expect(el.elementId).toBe('el_c');
     });
 });
 
 describe('CheckoutElement.destroy', () => {
-    it('幂等；后续非 destroy/off 调用抛 INSTANCE_DESTROYED', () => {
+    it('idempotent; subsequent non-destroy/off calls throw INSTANCE_DESTROYED', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'cardNumber', 'el_c');
         el.destroy();
-        el.destroy(); // 幂等
+        el.destroy(); // idempotent
 
         const focus = inputAction(el, 'focus');
         expect(() => focus()).toThrow();
@@ -397,7 +398,7 @@ describe('CheckoutElement.destroy', () => {
         }
     });
 
-    it('destroy 后 off 不抛', () => {
+    it('off does not throw after destroy', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const handler = (): void => {};
@@ -408,7 +409,7 @@ describe('CheckoutElement.destroy', () => {
 });
 
 describe('CheckoutElement input actions', () => {
-    it('cardNumber 支持 focus/blur/clear 并发对应命令', async () => {
+    it('cardNumber supports focus/blur/clear and sends the corresponding commands', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'cardNumber', 'el_c');
         await inputAction(el, 'focus')();
@@ -420,7 +421,7 @@ describe('CheckoutElement input actions', () => {
         expect(names).toContain('clear');
     });
 
-    it('expressCheckout 不提供 clear（方法不存在）', () => {
+    it('expressCheckout does not provide clear (method does not exist)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_c');
         expect(
@@ -431,7 +432,7 @@ describe('CheckoutElement input actions', () => {
 });
 
 describe('CheckoutElement.update', () => {
-    it('发 updateElement 命令', async () => {
+    it('sends the updateElement command', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         await el.update({ showPostalCode: false });
@@ -443,7 +444,7 @@ describe('CheckoutElement.update', () => {
         });
     });
 
-    it('destroy 后 update 抛 INSTANCE_DESTROYED', async () => {
+    it('update throws INSTANCE_DESTROYED after destroy', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         el.destroy();
@@ -452,7 +453,7 @@ describe('CheckoutElement.update', () => {
         });
     });
 
-    it('updateElement reject 时整次透传该 reject（不部分应用本地 options）', async () => {
+    it('when updateElement rejects, the whole call propagates that reject (does not partially apply local options)', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const rejectErr = {
@@ -467,20 +468,20 @@ describe('CheckoutElement.update', () => {
     });
 });
 
-describe('CheckoutElement 事件严格匹配', () => {
-    it('其他 elementId 的 elementReady 不触发本 Element 的 mount resolve', async () => {
+describe('CheckoutElement strict event matching', () => {
+    it("another elementId's elementReady does not trigger this Element's mount resolve", async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_self');
         const container = makeContainer('t-strict');
         const mounted = el.mount(container);
 
-        // 共享 transport 上另一 Element 的事件：不应驱动本 mount
+        // Another Element's event on the shared transport: should not drive this mount
         transport.emit('elementReady', { elementId: 'el_other' });
-        // 无 elementId 的事件：同样不匹配
+        // Event without elementId: also does not match
         transport.emit('elementReady', {});
         expect(el.getStatus()).toBe('loading');
 
-        // 本 elementId 事件才 resolve
+        // Only this elementId's event resolves
         transport.emit('elementReady', { elementId: 'el_self' });
         await expect(mounted).resolves.toBeUndefined();
         expect(el.getStatus()).toBe('ready');
@@ -488,7 +489,7 @@ describe('CheckoutElement 事件严格匹配', () => {
 });
 
 describe('CheckoutElement expressCheckout', () => {
-    it('mount 插入指向 /sdk/element/expressCheckout 的 iframe', async () => {
+    it('mount inserts an iframe pointing to /sdk/element/expressCheckout', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         const container = makeContainer('t-express');
@@ -502,7 +503,7 @@ describe('CheckoutElement expressCheckout', () => {
         await expect(mounted).resolves.toBeUndefined();
     });
 
-    it('不提供 focus/blur/clear（方法不存在）', () => {
+    it('does not provide focus/blur/clear (methods do not exist)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         expect((el as unknown as { focus?: unknown }).focus).toBeUndefined();
@@ -510,18 +511,18 @@ describe('CheckoutElement expressCheckout', () => {
         expect((el as unknown as { clear?: unknown }).clear).toBeUndefined();
     });
 
-    it('不提供 confirm（confirm 为 Instance 级且仅卡）', () => {
+    it('does not provide confirm (confirm is Instance-level and card-only)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         expect((el as unknown as { confirm?: unknown }).confirm).toBeUndefined();
     });
 
-    it('elementReady 透出 availableWallets（getAvailableWallets 可读）', async () => {
+    it('elementReady surfaces availableWallets (readable via getAvailableWallets)', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         const container = makeContainer('t-express-ready');
 
-        // mount 前无可用性数据
+        // No availability data before mount
         expect(el.getAvailableWallets()).toBeUndefined();
 
         const mounted = el.mount(container);
@@ -531,13 +532,13 @@ describe('CheckoutElement expressCheckout', () => {
         expect(el.getAvailableWallets()).toEqual(wallets);
     });
 
-    it('其他 elementId 的 elementReady 不污染本 Element 的 availableWallets', async () => {
+    it("another elementId's elementReady does not pollute this Element's availableWallets", async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         const container = makeContainer('t-express-strict');
         const mounted = el.mount(container);
 
-        // 另一 Element 的 elementReady（携 availableWallets）不应写入本 Element
+        // Another Element's elementReady (carrying availableWallets) should not be written to this Element
         transport.emit('elementReady', {
             elementId: 'el_other',
             availableWallets: { applePay: true, googlePay: true },
@@ -550,7 +551,7 @@ describe('CheckoutElement expressCheckout', () => {
         expect(el.getAvailableWallets()).toEqual(wallets);
     });
 
-    it('expressAvailabilityChange 事件透出给 on 回调并更新 getAvailableWallets', () => {
+    it('expressAvailabilityChange event surfaces to the on callback and updates getAvailableWallets', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
 
@@ -564,11 +565,11 @@ describe('CheckoutElement expressCheckout', () => {
 
         expect(received).toHaveLength(1);
         expect(received[0]).toEqual(wallets);
-        // 句柄本地可用性快照同步更新
+        // The handle's local availability snapshot is updated in sync
         expect(el.getAvailableWallets()).toEqual(wallets);
     });
 
-    it('paymentResult 可通过 on 透出给回调', () => {
+    it('paymentResult surfaces to the callback via on', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
 
@@ -589,11 +590,11 @@ describe('CheckoutElement expressCheckout', () => {
     });
 });
 
-describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
+describe('CheckoutElement iframe auto-resize (parent side)', () => {
     /**
-     * 为 jsdom iframe 固定一个 contentWindow 哨兵对象，并返回它。
-     * jsdom 的 iframe.contentWindow 可能为空/不稳定，用 defineProperty 固定为可控哨兵，
-     * 以便用 new MessageEvent({ source }) 精确匹配/错配来源。
+     * Fix a contentWindow sentinel object for the jsdom iframe and return it.
+     * jsdom's iframe.contentWindow may be null/unstable, so use defineProperty to fix it to a
+     * controllable sentinel, to precisely match/mismatch the source via new MessageEvent({ source }).
      */
     function fixContentWindow(iframe: HTMLIFrameElement): Window {
         const sentinel = {} as Window;
@@ -604,7 +605,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         return sentinel;
     }
 
-    /** 构造一条 resize 消息事件（可覆写 source/origin/data）。 */
+    /** Build a resize message event (source/origin/data can be overridden). */
     function resizeEvent(opts: {
         source: Window | null;
         origin: string;
@@ -617,12 +618,12 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         });
     }
 
-    /** 合法 resize 载荷。 */
+    /** Valid resize payload. */
     function resizeData(elementId: string, height: number): unknown {
         return { type: IFRAME_RESIZE_MESSAGE_TYPE, elementId, height };
     }
 
-    it('iframe src 携带 elementId 参数（供 child 原样回传）', () => {
+    it('iframe src carries the elementId param (for the child to echo back verbatim)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz_src');
         const container = makeContainer('t-rsz-src');
@@ -631,7 +632,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(src).toContain('elementId=el_rsz_src');
     });
 
-    it('合法消息（source=contentWindow、origin=hostOrigin、elementId 匹配）设置 iframe.style.height', () => {
+    it('valid message (source=contentWindow, origin=hostOrigin, elementId matches) sets iframe.style.height', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-ok');
@@ -645,7 +646,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('321px');
     });
 
-    it('来源错误（source 非本 iframe.contentWindow）被忽略', () => {
+    it('wrong source (source is not this iframe.contentWindow) is ignored', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-badsrc');
@@ -664,7 +665,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('');
     });
 
-    it('origin 错误被忽略', () => {
+    it('wrong origin is ignored', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-badorigin');
@@ -682,7 +683,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('');
     });
 
-    it('elementId 不匹配被忽略', () => {
+    it('elementId mismatch is ignored', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-badid');
@@ -700,7 +701,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('');
     });
 
-    it('畸形消息（非 resize 结构）被忽略', () => {
+    it('malformed message (not a resize structure) is ignored', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-malformed');
@@ -708,7 +709,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         const iframe = container.querySelector('iframe') as HTMLIFrameElement;
         const cw = fixContentWindow(iframe);
 
-        // 缺字段 / 类型错误 / 完全无关
+        // Missing field / wrong type / completely unrelated
         window.dispatchEvent(
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: { type: 'other', height: 400 } })
         );
@@ -725,7 +726,7 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('');
     });
 
-    it('相同高度去重（最终值稳定）', () => {
+    it('same height is deduplicated (final value stable)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-dedupe');
@@ -737,19 +738,19 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 200) })
         );
         expect(iframe.style.height).toBe('200px');
-        // 再发相同高度：去重，不改变最终值
+        // Send the same height again: deduplicated, final value unchanged
         window.dispatchEvent(
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 200) })
         );
         expect(iframe.style.height).toBe('200px');
-        // 发不同高度：更新
+        // Send a different height: updated
         window.dispatchEvent(
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 260) })
         );
         expect(iframe.style.height).toBe('260px');
     });
 
-    it('destroy 后监听器移除：后续合法消息不再改变高度', () => {
+    it('after destroy the listener is removed: subsequent valid messages no longer change the height', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-destroy');
@@ -763,7 +764,8 @@ describe('CheckoutElement iframe 自适应高度（parent 侧）', () => {
         expect(iframe.style.height).toBe('150px');
 
         el.destroy();
-        // destroy 后 iframe 已移除；即便复用旧引用再派发合法消息，也不应改变其 height
+        // After destroy the iframe is removed; even reusing the old reference to dispatch a valid
+        // message should not change its height
         window.dispatchEvent(
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 999) })
         );

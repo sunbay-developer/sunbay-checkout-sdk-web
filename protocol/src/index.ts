@@ -1,9 +1,10 @@
 /**
- * 协议契约统一出口 —— `@sunbay/checkout-sdk-protocol`（单一真源）。
+ * Unified export for the protocol contract — `@sunbay/checkout-sdk-protocol` (single source of truth).
  *
- * 商户 SDK（checkout-sdk-web/js）与 checkout 托管运行时（checkout/src/sdk-runtime）
- * 共用本契约。同仓的 `js` 通过 pnpm workspace（`workspace:*`）本地链接消费本包；
- * 跨仓的 `checkout` 消费已发布的 npm 包。依赖方向单向：零反向依赖。
+ * The merchant SDK (checkout-sdk-web/js) and the checkout hosted runtime (checkout/src/sdk-runtime)
+ * share this contract. The in-repo `js` consumes this package via local linking through the pnpm
+ * workspace (`workspace:*`); the cross-repo `checkout` consumes the published npm package. The
+ * dependency direction is one-way: zero reverse dependencies.
  */
 
 export {

@@ -1,9 +1,9 @@
 /**
- * @sunbay/checkout-js 公共入口（真源）。
+ * @sunbay/checkout-js public entry (source of truth).
  *
- * 导出 `createCheckout` 入口、`CheckoutInstance` / `CheckoutElement` 句柄类型，
- * 以及协议公开类型（供 TS 使用者消费）。
- * IIFE 产物下，额外在 `window.SunbayCheckout` 暴露 `{ createCheckout }`。
+ * Exports the `createCheckout` entry, the `CheckoutInstance` / `CheckoutElement` handle types,
+ * and the public protocol types (for TS consumers).
+ * In the IIFE build, additionally exposes `{ createCheckout }` on `window.SunbayCheckout`.
  */
 
 export { createCheckout } from './createCheckout';
@@ -24,7 +24,7 @@ export type { CheckoutElementOptions, ElementTransport } from './Element';
 
 export type { Env } from './config/env';
 
-// 协议公开类型（面向 TS 使用者的契约）。
+// Public protocol types (the contract for TS consumers).
 export {
     ErrorCode,
     type ErrorCodeValue,
@@ -51,10 +51,11 @@ export {
 import { createCheckout } from './createCheckout';
 
 /**
- * IIFE / 浏览器全局：挂载 `window.SunbayCheckout = { createCheckout }`。
+ * IIFE / browser global: mount `window.SunbayCheckout = { createCheckout }`.
  *
- * tsup 的 IIFE 产物已以 `globalName: 'SunbayCheckout'` 暴露模块导出，此处显式确保
- * `window.SunbayCheckout.createCheckout` 可用（同时兼容未来再导出更多入口）。
+ * The tsup IIFE build already exposes the module exports via `globalName: 'SunbayCheckout'`;
+ * this explicitly ensures `window.SunbayCheckout.createCheckout` is available (while staying
+ * compatible with re-exporting more entries in the future).
  */
 if (typeof window !== 'undefined') {
     const w = window as typeof window & {
@@ -64,9 +65,10 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * 包版本。构建期由 tsup 的 `define` 从 `package.json` 注入 `__SDK_VERSION__`
- * （见 tsup.config.ts），使代码版本号永远与 package.json 同步。未经构建的环境
- * （如 vitest 直接跑 src）无此 define，回退到 `'0.0.0'`。
+ * Package version. Injected at build time by tsup's `define` from `package.json` as
+ * `__SDK_VERSION__` (see tsup.config.ts), so the code's version always stays in sync with
+ * package.json. Environments without a build (e.g. vitest running src directly) have no such
+ * define and fall back to `'0.0.0'`.
  */
 declare const __SDK_VERSION__: string;
 export const version: string =
