@@ -100,20 +100,60 @@ pnpm --filter @sunbay/checkout-sdk-js run build
 ## 4. Publishing / versioning (semver + PROTOCOL_MAJOR)
 
 - The two packages `@sunbay/checkout-sdk-protocol` / `@sunbay/checkout-sdk-js`
-  publish independently to the official registry, both with
-  `publishConfig.access = public`.
+  publish to the official registry (`https://registry.npmjs.org`), both with
+  `publishConfig.access = public`. Published history: 0.0.1 (protocol) → **0.0.2
+  (both, lockstep)**.
+- **Lockstep versioning（强制）**：两包**始终同版本号**。任一包发版时两包一起升到同一
+  版本并同时发布（即使某包无改动也陪升）。好处：心智只记一个版本，`js@x ⇄ protocol@x`
+  一目了然；js 的 `dependencies` 固定引用同版本 protocol。
+- **一键发布（固化脚本）**：`pnpm release <version>`（= `bash scripts/release.sh`）。
+  脚本自动：两包升版本 → build → type-check+test 门禁 → 发布。先 protocol 后 js。
+  dry-run：`pnpm release <version> --dry-run`（只 build+pack 校验，不实发；会临时改 package.json
+  版本，之后 `git checkout protocol/package.json js/package.json` 还原）。
+  发布后手动收尾：git 提交两包版本改动并 push；到 `checkout` 仓 bump 依赖 `^<version>` +
+  `npm install` 锁 lockfile。
+- **发布实操正解（脚本已封装，手动发时务必照此，否则必失败）**：
+  - **不要直接 `pnpm publish`**：本机全局 `~/.npmrc` 的 `registry` 指向淘宝镜像
+    （`registry.npmmirror.com`，只读），`pnpm publish` 会误发到镜像并 401/404。
+  - **不要直接 `npm publish`（对 js）**：js 依赖 `@sunbay/checkout-sdk-protocol: workspace:*`，
+    `npm publish` 不会替换 `workspace:*`，商户 `npm install` 解析不了。
+  - **正解 = `pnpm pack` + `npm publish <tarball>`**：`pnpm pack` 自动把 `workspace:*`
+    替换为已发布的实际版本并生成 tarball；再用显式参数发布该 tarball：
+    `npm publish <tgz> --registry https://registry.npmjs.org --//registry.npmjs.org/:_authToken="$SUNBAY_NPM_TOKEN" --access public`。
+    （协议 npm view 可能有几分钟索引传播延迟，属正常。）
 - **semver discipline**:
   - Any **breaking protocol change** in protocol (removing/altering envelope
     fields, commands, events, or error-code semantics) → **bump major** and bump
     `PROTOCOL_MAJOR` in sync; the runtime handshake rejects incompatible peers.
   - Backward-compatible additions → minor; fixes/docs → patch.
-  - The npm version aids dependency management, but **runtime compatibility is
-    governed by the handshake `PROTOCOL_MAJOR`**.
+  - 0.0.x 早期阶段 lockstep patch 递增即可；runtime 兼容最终由握手 `PROTOCOL_MAJOR` 裁决。
 - **Publishing token**: environment variable `SUNBAY_NPM_TOKEN` (granular token,
   Read and write + Bypass 2FA). **Never print, commit, or write the token value
-  into the repo/logs.**
+  into the repo/logs.** 脚本用命令行 `--//registry.npmjs.org/:_authToken=` 传入，
+  绝不持久化 `.npmrc`（若临时写了务必发布后立即删）。
 - **Cross-repo `checkout` always consumes the published registry package** (not
-  a symlink), which is safest for Turbopack.
+  a symlink), which is safest for Turbopack. 发布新版本后，`checkout` 需 bump 依赖
+  范围 + `npm install --registry https://registry.npmjs.org`（绕镜像）锁 lockfile，
+  CI/干净环境 `npm ci` 才能装到。
+
+### 本地真机联调（playground / demo）
+
+`pnpm dev:playground`（= `bash scripts/dev-playground.sh`）构建 SDK 产物（含 IIFE
+`dist/index.global.js`，供 demo 的 `<script>` 引入）。另两个长驻进程手动起（Agent 不起长驻进程）：
+
+```bash
+# 1) checkout hosted（另一终端）
+cd ../checkout && npm run dev            # :3000
+# 2) 构建 SDK 产物
+pnpm dev:playground
+# 3) demo server（另一终端；首次 cp js/examples/.env.example .env.local 填凭据）
+cd js/examples && node server.mjs        # :8080
+# 打开 http://localhost:8080/examples/customization-playground.html
+```
+
+定制 playground 覆盖全部主题定制真机验证：colorScheme / appearance.variables /
+appearance.rules / 钱包按钮 buttonTheme·buttonType·buttonHeight。跨源（:3000 hosted
+vs :8080 商户页）真实覆盖 SDK 的 postMessage / origin 校验。
 
 ---
 

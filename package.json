@@ -9,6 +9,9 @@
         "build:protocol": "pnpm --filter @sunbay/checkout-sdk-protocol run build",
         "build:js": "pnpm --filter @sunbay/checkout-sdk-js run build",
         "type-check": "pnpm -r run type-check",
-        "test": "pnpm -r run test"
+        "test": "pnpm -r run test",
+        "release": "bash scripts/release.sh",
+        "release:dry": "bash scripts/release.sh",
+        "dev:playground": "bash scripts/dev-playground.sh"
     }
 }
