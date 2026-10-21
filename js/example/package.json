@@ -1,0 +1,11 @@
+{
+    "name": "@sunbay/checkout-sdk-example",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Runnable browser examples for the Checkout Web SDK (@sunbay/checkout-sdk-js). Dependency-free session-mock backend + demo pages. Not published.",
+    "type": "module",
+    "scripts": {
+        "start": "node server/server.mjs",
+        "serve": "node server/server.mjs"
+    }
+}

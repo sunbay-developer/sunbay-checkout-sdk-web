@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Full card Element — Sunbay Checkout SDK</title>
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <main class="page">
+            <nav class="topnav"><a href="/">← All examples</a></nav>
+            <header class="hero">
+                <h1>1 · Full card Element</h1>
+                <p class="muted">
+                    A complete single-page checkout. The merchant page creates a session, calls
+                    <code>createCheckout()</code>, then mounts three Elements — an
+                    <code>expressCheckout</code> wallet row (Apple Pay / Google Pay), a combined
+                    <code>card</code> Element (number + expiry + CVC in one hosted iframe), and a
+                    billing <code>address</code> Element — and finally calls
+                    <code>confirm()</code>. Card data stays inside the hosted iframes and never
+                    touches this page.
+                </p>
+                <div id="health" class="banner" hidden></div>
+            </header>
+
+            <section class="panel">
+                <div class="toolbar">
+                    <button id="init">Create session &amp; mount</button>
+                    <span id="status" class="status"></span>
+                </div>
+                <p id="summary" class="summary muted"></p>
+
+                <!-- Express wallets (Apple Pay / Google Pay). Renders only the wallets
+                     available in the current environment; emits expressAvailabilityChange. -->
+                <h3>Express checkout</h3>
+                <div class="slot" id="slot-express"></div>
+                <p id="express-note" class="muted"></p>
+
+                <!-- Combined card. The SDK mounts a visible iframe into this empty container. -->
+                <h3>Card</h3>
+                <div class="slot" id="slot-card"></div>
+
+                <!-- Billing address Element. -->
+                <h3>Billing address</h3>
+                <div class="slot" id="slot-bill"></div>
+
+                <div class="toolbar">
+                    <button id="pay" disabled>Pay now</button>
+                    <button id="clearBtn" class="ghost" disabled>Clear card</button>
+                    <button id="destroy" class="ghost" disabled>Destroy instance</button>
+                </div>
+            </section>
+
+            <aside id="logdock" class="logdock collapsed" aria-label="Event log">
+                <div class="logdock-head">
+                    <span class="logdock-title">Event log</span>
+                    <button id="logToggle" class="logdock-toggle" aria-expanded="false">
+                        Expand
+                    </button>
+                </div>
+                <pre id="log" class="log"></pre>
+            </aside>
+        </main>
+
+        <!-- Load the real published SDK IIFE build (exposes window.SunbayCheckout). -->
+        <script src="/dist/index.global.js"></script>
+        <script type="module" src="/full-element.js"></script>
+    </body>
+</html>

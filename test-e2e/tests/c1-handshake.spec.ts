@@ -81,16 +81,35 @@ test('C1-05 paymentMethods filter (subtract/sort only) @p2 @c1', async ({ page }
     const health = await getHealth();
     test.skip(!health.hasCredentials, 'requires sandbox credentials');
 
+    // First, discover the methods this session actually offers (no filter).
+    const base = await setup(page, { session: 'auto', elements: [] });
+    expect(base.ok, base.error?.message).toBe(true);
+    const original: string[] = await page.evaluate(() =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((window as any).__sunbayHarness.instance.getSession().paymentMethods ?? []).map(
+            (m: { method: string }) => m.method
+        )
+    );
+    await callHarness(page, 'reset');
+    test.skip(original.length < 1, 'session offers no payment methods to filter');
+
+    // Hide the first real method; the result must drop it and never add anything.
+    const toHide = original[0];
     const result = await setup(page, {
         session: 'auto',
-        paymentMethods: { hide: ['applePay'], order: ['card', 'googlePay'] },
+        paymentMethods: { hide: [toHide] },
         elements: [],
     });
     expect(result.ok, result.error?.message).toBe(true);
-    const session = await page.evaluate(() =>
+    const methods: string[] = await page.evaluate(() =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__sunbayHarness.instance.getSession()
+        ((window as any).__sunbayHarness.instance.getSession().paymentMethods ?? []).map(
+            (m: { method: string }) => m.method
+        )
     );
-    const methods = (session.paymentMethods ?? []).map((m: { method: string }) => m.method);
-    expect(methods).not.toContain('applePay');
+    // Subtract-only: hidden method is gone, and the result is a subset of the original.
+    expect(methods).not.toContain(toHide);
+    for (const m of methods) {
+        expect(original).toContain(m);
+    }
 });

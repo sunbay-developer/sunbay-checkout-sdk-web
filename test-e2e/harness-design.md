@@ -1,66 +1,73 @@
-# 测试宿主页 + Harness 钩子契约（harness-design.md）
+# Harness page + hook contract (harness-design.md)
 
-> 本文件定义真机测试的**执行载体**：一个测试专用的「标准商户页模拟器」（test harness）
-> 及其暴露给测试用例的确定性全局钩子 `window.__sunbayHarness`。用例只写**声明式配置 +
-> 断言**，所有 SDK 调用细节由 harness 封装，使 AI 落地可执行测试时歧义最小。
+> This file defines the real-device tests' **execution vehicle**: a test-only
+> "standard merchant-page simulator" (the harness) and the deterministic global
+> `window.__sunbayHarness` it exposes to test cases. Cases write only
+> **declarative config + assertions**; all SDK call details are encapsulated by
+> the harness, minimizing ambiguity when an AI lands executable tests.
 >
-> harness 属于**测试基础设施**，不是 SDK 的一部分，不进入发布产物。它加载 SDK 的真实
-> IIFE 产物，模拟一个真实商户页。**harness 绝不触碰卡值**（PCI）。
+> The harness is **test infrastructure**, not part of the SDK, and is never
+> published. It loads the real SDK IIFE build and simulates a real merchant
+> page. **The harness never touches card values** (PCI).
 
 ---
 
-## 1. 组成
+## 1. Components
 
-| 组件 | 角色 | 默认 origin |
+| Component | Role | Default origin |
 |---|---|---|
-| `harness.html` + `harness.mjs` | 测试宿主页：加载 SDK IIFE 产物，暴露 `window.__sunbayHarness`，提供挂载槽位容器 | `http://localhost:8090` |
-| `server`（沿用 examples `server.mjs` 模式） | 测试后端：持沙箱商户密钥，`POST /api/create-session` 返回 `sessionId` | 同宿主页 origin |
-| hosted runtime | 被托管的 `/sdk/main`、`/sdk/field/*`、`/sdk/element/*` | `http://localhost:3000` 或真实环境 |
-| stub runtime（可选） | 伪 hello 端点，仅供 `PROTOCOL_UNSUPPORTED` 用例 | `test-e2e/` 内，按需起 |
+| `harness.html` + `harness.mjs` | Harness page: loads the SDK IIFE build, exposes `window.__sunbayHarness`, provides mount slots | `http://localhost:8090` |
+| `server/server.mjs` | Test backend: holds the sandbox merchant key, `POST /api/create-session` returns a `sessionId` | same origin as the harness |
+| hosted runtime | Hosts `/sdk/main`, `/sdk/field/*`, `/sdk/element/*` | `http://localhost:3000` or a real environment |
+| stub runtime (optional) | Fake hello endpoint (for PROTOCOL_UNSUPPORTED), started on demand | in `test-e2e/`, `:8099` |
 
-宿主页提供一组 **id 固定的空容器**（挂载槽位 slot），供用例按 id 定位，例如：
+The harness provides a set of **empty containers with fixed ids** (mount slots)
+that cases locate by id, e.g.:
 
 ```html
 <div id="slot-card"></div>
 <div id="slot-num"></div>   <div id="slot-exp"></div>   <div id="slot-cvc"></div>
 <div id="slot-bill"></div>  <div id="slot-ship"></div>
 <div id="slot-express"></div>
-<!-- 额外备用槽位：slot-num1 / slot-num2 / slot-b1 / slot-b2 / slot-e1 / slot-e2 等 -->
+<!-- spare slots: slot-card2 / slot-num1 / slot-num2 / slot-b1 / slot-b2 / slot-e1 / slot-e2 -->
 ```
 
-> slot 容器必须唯一且为空（SDK `mount` 要求容器唯一命中且 `childElementCount===0`）。
-> `reset()` 会清空所有 slot。
+> A slot container must resolve uniquely and be empty (the SDK `mount` requires a
+> unique match with `childElementCount===0`). `reset()` clears all slots.
 
-> **多实例语义**：`instance` 始终指向「最近一次 `setup` 成功创建的实例」，仅作单实例场景
-> 的便捷引用。多实例用例（C7-10）**必须**通过 `instances[instanceKey]` 定位各实例，不要依赖
-> `instance` 单引用；同理 `destroy(instanceKey)` / `confirm(opts, instanceKey)` /
-> `updateCheckout(patch, instanceKey)` 需显式传 key。
+> **Multi-instance semantics**: `instance` always points at the "most recently
+> created instance from a successful `setup`" and is a convenience for the
+> single-instance case. Multi-instance cases (C7-10) **must** locate each
+> instance via `instances[instanceKey]`; likewise `destroy(instanceKey)` /
+> `confirm(opts, instanceKey)` / `updateCheckout(patch, instanceKey)` take an
+> explicit key.
 
 ---
 
-## 2. 全局钩子契约 `window.__sunbayHarness`
+## 2. Global hook contract `window.__sunbayHarness`
 
-> 类型以 TS 伪代码表达，实际实现用 JS/TS 均可。所有方法均 `async` 返回，错误以结构化
-> `CheckoutError` 形态记录，不抛裸异常（除非契约显式声明同步抛）。
+> Expressed as TS pseudo-types; the implementation may be JS or TS. All methods
+> are `async` and record errors as a structured `CheckoutError` rather than
+> throwing raw exceptions (unless the contract explicitly declares a sync throw).
 
 ```ts
 interface SunbayHarness {
-    // --- 构造场景（声明式）---
-    // Create a checkout instance from a freshly created sandbox session,
-    // then create + mount the declared elements. Resolves after createCheckout
-    // settles and all auto-mount elements reach ready or loadError.
+    // --- Build a scenario (declarative) ---
+    // Create an instance from a session, then create + mount the declared
+    // elements. Resolves after createCheckout settles and all auto-mount elements
+    // reach ready or loadError.
     setup(config: HarnessConfig): Promise<SetupResult>;
 
-    // --- 实时句柄（断言用；setup 成功后可读）---
+    // --- Live handles (for assertions; readable after a successful setup) ---
     instance: CheckoutInstance | null;              // shortcut to the most recently created instance
     instances: Record<string, CheckoutInstance>;    // named instances (multi-instance cases)
     elements: Record<string, CheckoutElement>;      // keyed by slot selector, e.g. '#slot-card'
 
-    // --- 观测记录器（断言的主要数据源）---
+    // --- Observers (primary assertion data sources) ---
     events: HarnessEvent[];          // ordered instance/element events + createError records
     parentMessages: ParentMessage[]; // every window 'message' the parent window received
 
-    // --- 操作（映射 SDK API；用例 steps 调用）---
+    // --- Operations (mirror the SDK API; called by case steps) ---
     confirm(opts?: ConfirmOptions, instanceKey?: string): Promise<ConfirmRecord>;
     update(slot: string, patch: Partial<ElementOptions>): Promise<void>; // element.update
     updateCheckout(patch: { locale?: string; appearance?: Appearance }, instanceKey?: string): Promise<void>;
@@ -68,9 +75,9 @@ interface SunbayHarness {
     unmount(slot: string): Promise<void>;
     mount(slot: string): Promise<MountRecord>;       // re-mount a previously created element
     createElement(spec: ElementSpec, instanceKey?: string): Promise<CreateRecord>; // late create (conflict cases)
-    destroy(instanceKey?: string): Promise<void>;    // instance.destroy; default = single instance
+    destroy(instanceKey?: string): Promise<void>;    // instance.destroy; default = the default instance
 
-    // --- 复位 ---
+    // --- Reset ---
     reset(): void;                   // destroy all instances, clear slots, clear records
 }
 ```
@@ -80,7 +87,7 @@ interface SunbayHarness {
 ```ts
 interface HarnessConfig {
     // Session source. 'auto' => call test backend POST /api/create-session.
-    // A string => use that sessionId directly (pre-created).
+    // A string => use that sessionId directly (pre-created / fake for error paths).
     session: 'auto' | string;
 
     // Optional named instance key for multi-instance cases (default '__default__').
@@ -92,6 +99,10 @@ interface HarnessConfig {
     appearance?: Appearance;         // colorScheme / variables / rules (instance-level initial)
     paymentMethods?: PaymentMethodFilter;
 
+    // Session variants passed to the backend (C3-09).
+    collectBillingAddress?: boolean;
+    collectShippingAddress?: boolean;
+
     elements: ElementSpec[];
 }
 
@@ -101,22 +112,22 @@ interface ElementSpec {
     options?: ElementOptions;        // per-element options incl. appearance / express options / address mode
     mount?: boolean;                 // default true; false => create only (no DOM mount)
 
-    // Mutual-exclusion cases: when true, create() is EXPECTED to throw ELEMENT_CONFLICT
-    // synchronously. setup() catches it, records a 'createError' event, and continues
-    // with the remaining elements instead of aborting.
+    // Mutual-exclusion cases: when true, create() is EXPECTED to throw
+    // ELEMENT_CONFLICT synchronously. setup() catches it, records a 'createError'
+    // event, and continues with the remaining elements instead of aborting.
     expectConflict?: boolean;
 }
 ```
 
-### 2.2 结果与记录结构
+### 2.2 Result and record shapes
 
 ```ts
 interface SetupResult {
     ok: boolean;                     // createCheckout resolved
     error?: CheckoutError;           // set when createCheckout rejected (handshake/initialize)
     checkoutId?: string;
-    // Per-slot creation outcome. For expectConflict slots, creationErrors[slot] holds
-    // the captured ELEMENT_CONFLICT; otherwise undefined.
+    // Per-slot creation outcome. For expectConflict slots, creationErrors[slot]
+    // holds the captured ELEMENT_CONFLICT; otherwise undefined.
     creationErrors?: Record<string, CheckoutError>;
     // Per-slot mount outcome (ready | loadError | skipped).
     mountStatus?: Record<string, 'ready' | 'loadError' | 'skipped'>;
@@ -149,123 +160,149 @@ interface CreateRecord { ok: boolean; error?: CheckoutError; slot: string; }
 
 ---
 
-## 3. setup() 内部行为（规范）
+## 3. setup() internal behavior (normative)
 
-`setup(config)` 必须按下述顺序执行，保证用例的 `expected` 可被确定性观测：
+`setup(config)` MUST execute in the following order so a case's `expected` is
+deterministically observable:
 
-1. **建单**：`session==='auto'` → `POST /api/create-session` 拿 `sessionId`；否则用传入值。
-   建单失败 → `SetupResult.ok=false` 且 `error` 为结构化错误，不继续。
-2. **createCheckout**：用 `sessionId` + `env`/`hostOrigin`/`locale`/`appearance`/
-   `paymentMethods` 调 `createCheckout`。
-   - resolve → 存入 `instances[instanceKey]`（及 `instance` 快捷引用），记录 `checkoutId`。
-   - reject（如 `RUNTIME_LOAD_FAILED` / `PROTOCOL_UNSUPPORTED` / initialize 失败）→
-     `ok=false`、`error=<CheckoutError>`，返回（不再 create elements）。
-3. **订阅实例级事件**：对 `paymentResult` / `paymentStateChange` / `error` 调 `instance.on`，
-   回调把 `{source:'instance', name, payload}` 推入 `events`。
-4. **逐个 create element**（按 config 顺序）：
-   - 普通项：`instance.create(type, options)` → 存入 `elements[slot]`；对该 element 订阅
-     `elementReady` / `loadError` / `ready` / `change` / `focus` / `blur` /
-     `expressAvailabilityChange`，回调推入 `events`（`source` 置为该 slot）。
-   - `expectConflict:true`：用 try/catch 包 `create`；捕获到同步抛的 `ELEMENT_CONFLICT`
-     → 推 `{source:slot, name:'createError', payload:error}`，写 `creationErrors[slot]`，
-     **继续**下一项；若未抛（契约被破坏）→ 记一条 `mountStatus[slot]` 异常供断言失败。
-   - `mount!==false`：`await element.mount(slot)`；ready → `mountStatus[slot]='ready'`；
-     loadError → `'loadError'`。`mount===false` → `'skipped'`。
-5. 全部处理完 → 返回聚合 `SetupResult`。
+1. **Create a session**: `session==='auto'` → `POST /api/create-session` for a
+   `sessionId`; otherwise use the given value. On failure →
+   `SetupResult.ok=false` with a structured `error`, and stop.
+2. **createCheckout**: call `createCheckout` with `sessionId` + `env` /
+   `hostOrigin` / `locale` / `appearance` / `paymentMethods`.
+   - resolve → store in `instances[instanceKey]` (and the `instance` shortcut),
+     record `checkoutId`.
+   - reject (e.g. `RUNTIME_LOAD_FAILED` / `PROTOCOL_UNSUPPORTED` / initialize
+     failure) → `ok=false`, `error=<CheckoutError>`, return (do not create
+     elements).
+3. **Subscribe instance-level events**: `instance.on` for `paymentResult` /
+   `paymentStateChange` / `error`; callbacks push `{source:'instance', name,
+   payload}` into `events`.
+4. **Create + mount elements** (in config order):
+   - Normal: `instance.create(type, options)` → store in `elements[slot]`;
+     subscribe `elementReady` / `loadError` / `ready` / `change` / `focus` /
+     `blur` / `expressAvailabilityChange` for that element, pushing into `events`
+     with `source` = the slot.
+   - `expectConflict:true`: wrap `create` in try/catch; on a synchronous
+     `ELEMENT_CONFLICT` → push `{source:slot, name:'createError', payload:error}`,
+     write `creationErrors[slot]`, and **continue** to the next item; if it does
+     not throw (contract violated) → record so the assertion fails.
+   - `mount!==false`: `await element.mount(slot)`; ready → `mountStatus[slot]='ready'`;
+     loadError → `'loadError'`. `mount===false` → `'skipped'`.
+5. Return the aggregated `SetupResult`.
 
-> `setup` 对单个 element 的 loadError **不**整体 reject；它把状态记进 `mountStatus`，由用例
-> 的 assertions 判定预期与否（有的用例就是要验 loadError 旁支）。
-
----
-
-## 4. 观测记录器
-
-### 4.1 事件记录器
-
-harness 对**所有订阅到的 SDK 事件**统一追加到 `events` 数组，保留**时间顺序**与**来源**
-（`instance` 或 slot）。用例断言通过 `evaluate_script` 取回 `__sunbayHarness.events`，按
-`name` / `source` / 顺序判定。
-
-- 事件 payload 按协议契约**不含卡值**；记录器**原样**保存 payload，正是为了让 PCI 断言能
-  反向扫描「不含卡号」。
-- `on` 注册后协议**不重放历史事件**，故 harness 必须在 `create`/`createCheckout` 后**立即**
-  订阅，避免漏采早期 `elementReady`。
-
-### 4.2 parentMessage 嗅探器
-
-harness 在**宿主页顶层 window** 安装一个常驻 `message` 监听器，把**每一条**收到的
-`MessageEvent` 记成 `ParentMessage`（含 `origin`、是否来自已追踪 iframe 的 contentWindow、
-原始 `data`）。用途：
-
-- 验证 iframe 自适应高度消息（`sunbay:checkout:iframe-resize`）的来源与 elementId。
-- **PCI 断言**：序列化全部 `parentMessages` 后扫描，确认**绝不出现卡号/CVV**。
-
-> 该监听器独立于 SDK 内部 Element 的 resize 监听，是测试侧的「旁路嗅探」，只读不干预。
+> `setup` does **not** reject on a single element's loadError; it records the
+> status in `mountStatus` so cases that test the loadError branch can assert it.
 
 ---
 
-## 5. 跨 iframe 填卡约定（PCI 关键）
+## 4. Observers
 
-涉及支付链路/输入态的用例要「填卡」，但**卡值绝不经过 harness 钩子或 SDK**。约定：
+### 4.1 Event recorder
 
-1. harness 只负责让 `cardNumber` / `cardExpiry` / `cardCvc` 三个 hosted field iframe 就绪，
-   并暴露各自的容器 slot 与 iframe（供自动化定位）。
-2. **填值由浏览器自动化直接进入 hosted field iframe 内部的输入框完成**（跨 iframe 定位到
-   iframe 内的 `<input>` 后输入），不调用任何 SDK/harness 方法传卡值。
-3. 填卡所用沙箱卡见 `fixtures/test-cards.ts`。
-4. 每个填卡用例**必须**附带 PCI 断言：对 `parentMessages` + `events` 序列化后扫描，
-   确认不含卡号（`4012000098765439`）、不含 CVV 片段、不含任何卡号连续子串。
+The harness appends **every subscribed SDK event** to `events` in **time order**
+with its **source** (`instance` or a slot). Assertions read back
+`__sunbayHarness.events` via `evaluate_script` and judge by `name` / `source` /
+order.
 
-> 因 hosted 与宿主页跨源，跨 iframe 定位 `<input>` 依赖执行器对同源策略的处理（真机环境下
-> 浏览器自动化工具可在各自 frame 上下文内操作）。若某执行环境无法跨源操作 iframe 内部
-> 输入，则该用例标记为需要「可控填卡入口」，由执行器按能力决定是否纳入 —— 但**无论如何都不
-> 得通过 SDK 通道传卡值**。
+- Event payloads are **card-value-free** by protocol contract; the recorder
+  stores payloads **verbatim**, precisely so the PCI assertion can scan for the
+  absence of a card number.
+- `on` does **not** replay history, so the harness subscribes **immediately**
+  after `create`/`createCheckout` to avoid missing early `elementReady`.
 
----
+### 4.2 parentMessage sniffer
 
-## 6. 桩与后端约定
+The harness installs a persistent `message` listener on the **top-level harness
+window**, recording **every** `MessageEvent` as a `ParentMessage` (its `origin`,
+whether it came from a tracked iframe's contentWindow, and the raw `data`).
+Used for:
 
-### 6.1 测试后端 `POST /api/create-session`
+- Verifying the iframe auto-resize message (`sunbay:checkout:iframe-resize`)
+  source and elementId.
+- The **PCI assertion**: serialize all `parentMessages` and confirm **no card
+  number / CVV ever appears**.
 
-- 请求：可选 body 指定币种/金额等（有安全默认）。
-- 行为：服务端用**沙箱商户密钥**（`.env.local` 读取，git-ignore）向开放平台建单。
-- 响应：`{ sessionId }`。密钥**绝不**下发浏览器。
-- `requires-session-variant` 用例：后端需支持建出带特定标记的单（如
-  `collectShippingAddress:true`）。若沙箱商户无法控制该标记，则对应用例降级为「仅断言
-  session 视图字段被正确透传」，并在用例标记注明。
-
-### 6.2 stub runtime（仅 `PROTOCOL_UNSUPPORTED`）
-
-- 一个最小的 `/sdk/main` 替身端点，握手时回一个 **不含当前 `PROTOCOL_MAJOR`** 的
-  `RuntimeHello`（`supportedMajorVersions` 置为不相交的值）。
-- 仅用于 `C1-03`。不碰卡值，不进发布产物。
-- 若执行环境不提供该桩，`C1-03` 退出真机范围（由 `createCheckout` 的 Vitest 覆盖保证），
-  用例保留但标 `requires-stub-runtime` 且归入可选集。
-
-### 6.3 blackhole origin（`RUNTIME_LOAD_FAILED`）
-
-- 指向一个**不会回 hello** 的不可达 origin（如 `http://127.0.0.1:59999`），用于触发
-  `createCheckout` 的 15s 握手超时 → `RUNTIME_LOAD_FAILED`。无需桩实现。
+> This sniffer is independent of the SDK's internal Element resize listener — a
+> read-only side observation on the test side.
 
 ---
 
-## 7. 断言取数速查（给执行器）
+## 5. Cross-iframe card entry convention (PCI-critical)
 
-| 要验证的东西 | 取数方式 |
+Payment-flow / input-state cases need to "enter a card", but **card values never
+pass through the harness hooks or the SDK**. Convention:
+
+1. The harness only makes the `cardNumber` / `cardExpiry` / `cardCvc` hosted
+   field iframes ready and exposes their containers/iframes (for automation to
+   locate).
+2. **Entry is done by the browser automation typing directly into the `<input>`
+   inside each hosted field iframe** (cross-iframe), without calling any
+   SDK/harness method that carries a card value.
+3. The sandbox card is in `fixtures/test-cards.ts`.
+4. Every card-entry case **must** carry the PCI assertion: serialize
+   `parentMessages` + `events` and confirm they contain no card number
+   (`4012000098765439`), no CVV fragment, and no contiguous PAN substring.
+
+> Because hosted and harness are cross-origin, locating the `<input>` inside the
+> iframe relies on the runner's handling of the same-origin policy (browser
+> automation can operate within each frame's own context). If a given execution
+> environment cannot operate inside the iframe, the case is marked as needing a
+> "controllable card-entry entry point", decided by the runner — but **under no
+> circumstances may card values travel via the SDK channel**.
+
+---
+
+## 6. Stub and backend conventions
+
+### 6.1 Test backend `POST /api/create-session`
+
+- Request: optional body selecting currency/amount/collect flags (safe defaults).
+- Behavior: the server creates a session against the open platform using the
+  **sandbox merchant key** (read from `.env.local`, git-ignored).
+- Response: `{ sessionId }`. The key is **never** sent to the browser.
+- `requires-session-variant` cases: the backend must be able to create a session
+  with a specific flag (e.g. `collectShippingAddress:true`). If the sandbox
+  merchant cannot control it, the case degrades to "assert session-view field
+  pass-through only", as noted on the case.
+
+### 6.2 Stub runtime (for `PROTOCOL_UNSUPPORTED` only)
+
+- A minimal `/sdk/main` stand-in that, at handshake, replies with a
+  `RuntimeHello` whose `supportedMajorVersions` **excludes** the current
+  `PROTOCOL_MAJOR` (set to a disjoint value).
+- Used only by `C1-03`. Touches no card data; not part of any published artifact.
+- If the environment provides no stub, `C1-03` leaves real-device scope (covered
+  by `createCheckout`'s Vitest) and is marked `requires-stub-runtime`, optional.
+
+### 6.3 Blackhole origin (`RUNTIME_LOAD_FAILED`)
+
+- Points at an **unreachable origin that never replies with hello** (e.g.
+  `http://127.0.0.1:59999`), triggering `createCheckout`'s 15s handshake timeout
+  → `RUNTIME_LOAD_FAILED`. No stub implementation needed.
+
+---
+
+## 7. Assertion data-source cheatsheet (for the runner)
+
+| What to verify | How to read it |
 |---|---|
-| createCheckout 成败/错误码 | `setup()` 返回的 `SetupResult.ok` / `error.code` |
-| 某 element 是否就绪 | `elements['#slot'].getStatus()` 或 `events` 中该 slot 的 `elementReady` |
-| 互斥冲突 | `SetupResult.creationErrors['#slot'].code === 'ELEMENT_CONFLICT'` 或 `events` 的 `createError` |
-| iframe src / 路由 / 定制参数 | 读 slot 内 `iframe.src`（查询串含 `colorScheme=` / `appearance=` / `applePay=` 等）—— **父窗口可直接读**，不受跨源限制 |
-| 主题/样式是否生效（iframe 内部） | **跨源约束**：hosted iframe 与宿主页不同源，父窗口 JS **无法**读其 `contentDocument` / 计算样式。须用下列之一：(a) 浏览器自动化**切到该 iframe 的 frame 上下文**内执行脚本读 `getComputedStyle` / `.dark` class；(b) **视觉断言**（对该 iframe 区域截图，比对深浅色/主色/圆角等视觉特征）。规格中凡写「跨 iframe 读计算样式」均指手段 (a)/(b)，非父窗口直接读 |
-| iframe 自适应高度 | slot 内 `iframe.style.height` > 0（父窗口可读）；`parentMessages` 含 resize 消息且 elementId 匹配 |
-| 事件序列（change/ready/focus/blur/express/payment*） | `__sunbayHarness.events` 过滤 `name`/`source`（父窗口可读） |
-| confirm 结果 | `confirm()` 返回的 `ConfirmRecord`（`outcome` / `error.code` / `operationId`） |
-| 支付终态 | `events` 中 `paymentResult` 的 `outcome.status` 与 `operationId` 对齐 confirm |
-| 钱包可用性 | `elements['#slot-express'].getAvailableWallets()`（父窗口可读） |
-| PCI：卡值不泄露 | 序列化 `parentMessages` + `events`，扫描不含卡号/CVV 子串（父窗口侧判定） |
-| 销毁后行为 | 销毁后调用返回/抛 `INSTANCE_DESTROYED` |
+| createCheckout success/failure/error code | `setup()`'s `SetupResult.ok` / `error.code` |
+| whether an element is ready | `elements['#slot'].getStatus()` or the slot's `elementReady` in `events` |
+| mutual-exclusion conflict | `SetupResult.creationErrors['#slot'].code === 'ELEMENT_CONFLICT'` or `events` `createError` |
+| iframe src / routing / customization params | read the slot's `iframe.src` (query contains `colorScheme=` / `appearance=` / `applePay=` ...) — **parent can read directly**, not blocked by cross-origin |
+| theming/style applied (inside the iframe) | **Cross-origin constraint**: the hosted iframe is a different origin, so parent JS **cannot** read its `contentDocument` / computed styles. Use one of: (a) browser automation **switches into the iframe's frame context** and runs script reading `getComputedStyle` / `.dark`; (b) **visual assertion** (screenshot the iframe region and compare). Wherever this doc says "read computed styles cross-iframe", it means (a)/(b), not a direct parent read |
+| iframe auto-resize | the slot's `iframe.style.height` > 0 (parent can read); `parentMessages` contains the resize message with a matching elementId |
+| event sequence (change/ready/focus/blur/express/payment*) | filter `__sunbayHarness.events` by `name`/`source` (parent can read) |
+| confirm result | the `ConfirmRecord` from `confirm()` (`outcome` / `error.code` / `operationId`) |
+| payment terminal state | `paymentResult` in `events`, its `outcome.status` and `operationId` aligned with confirm |
+| wallet availability | `elements['#slot-express'].getAvailableWallets()` (parent can read) |
+| PCI: no card leak | serialize `parentMessages` + `events`, scan for absence of card number / CVV (parent side) |
+| post-destroy behavior | calls after destroy return/throw `INSTANCE_DESTROYED` |
 
-> **跨源断言总则**：凡"iframe **内部** DOM/样式/文案"的断言，必须经 frame 上下文脚本或视觉
-> 比对取证；凡"iframe **外层**属性（src、style.height、是否存在）"与"父窗口观测的
-> events/parentMessages"，父窗口 JS 可直接读。执行器据此选择取数手段。
+> **Cross-origin assertion rule**: any assertion about iframe **internal**
+> DOM/style/text must be obtained via a frame-context script or a visual
+> comparison; any assertion about iframe **outer** attributes (`iframe.src`,
+> `style.height`, existence) and about parent-observed `events`/`parentMessages`
+> can be read directly by parent JS. The runner chooses the data source
+> accordingly.

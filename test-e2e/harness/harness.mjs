@@ -75,12 +75,81 @@ class Harness {
         this.events.push({ t: performance.now(), source, name, payload });
     }
 
+    /**
+     * Subscribe an element's events, recorded under its slot. Events are filtered
+     * by this element's elementId: because sibling elements share one transport,
+     * element.on(name) receives ALL elements' events of that name, so we only
+     * record the ones whose payload.elementId matches this element. Events that
+     * carry no elementId (e.g. expressAvailabilityChange — express is a singleton)
+     * are recorded unfiltered.
+     */
+    _subscribeElementEvents(slot, element) {
+        const id = element.elementId;
+        for (const name of ELEMENT_EVENTS) {
+            element.on(name, (payload) => {
+                const pid = payload && typeof payload === 'object' ? payload.elementId : undefined;
+                if (pid !== undefined && pid !== id) {
+                    return; // belongs to a sibling element on the shared transport
+                }
+                this._pushEvent(slot, name, payload);
+            });
+        }
+    }
+
     _createApi() {
         const w = window.SunbayCheckout;
         if (!w || typeof w.createCheckout !== 'function') {
             throw new Error('window.SunbayCheckout.createCheckout not available');
         }
         return w.createCheckout;
+    }
+
+    /**
+     * Create a sandbox session via the test backend, with a small retry to absorb
+     * transient open-platform / network blips (observed as intermittent "fetch
+     * failed" / 5xx). Returns { ok, sessionId } or { ok:false, error }.
+     */
+    async _createSession(config, attempts = 3) {
+        let lastError = 'unknown';
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const res = await fetch('/api/create-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        collectBillingAddress: config.collectBillingAddress,
+                        collectShippingAddress: config.collectShippingAddress,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    lastError = body.error || `create-session failed (${res.status})`;
+                    // 503 (no credentials) is not transient — do not retry.
+                    if (res.status === 503) break;
+                } else {
+                    const body = await res.json();
+                    if (body.sessionId) {
+                        return { ok: true, sessionId: body.sessionId };
+                    }
+                    lastError = 'create-session returned no sessionId';
+                }
+            } catch (err) {
+                lastError = String(err);
+            }
+            // Backoff before the next attempt.
+            if (i < attempts - 1) {
+                await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+            }
+        }
+        return {
+            ok: false,
+            error: {
+                code: 'SESSION_LOAD_FAILED',
+                message: lastError,
+                category: 'network',
+                errorId: 'e2e-session',
+            },
+        };
     }
 
     /**
@@ -94,40 +163,11 @@ class Harness {
         // 1. Obtain a sessionId.
         let sessionId;
         if (config.session === 'auto') {
-            try {
-                const res = await fetch('/api/create-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        collectBillingAddress: config.collectBillingAddress,
-                        collectShippingAddress: config.collectShippingAddress,
-                    }),
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    return {
-                        ok: false,
-                        error: {
-                            code: 'SESSION_LOAD_FAILED',
-                            message: body.error || `create-session failed (${res.status})`,
-                            category: 'network',
-                            errorId: 'e2e-session',
-                        },
-                    };
-                }
-                const body = await res.json();
-                sessionId = body.sessionId;
-            } catch (err) {
-                return {
-                    ok: false,
-                    error: {
-                        code: 'SESSION_LOAD_FAILED',
-                        message: String(err),
-                        category: 'network',
-                        errorId: 'e2e-session',
-                    },
-                };
+            const created = await this._createSession(config);
+            if (!created.ok) {
+                return { ok: false, error: created.error };
             }
+            sessionId = created.sessionId;
         } else {
             sessionId = config.session;
         }
@@ -190,10 +230,9 @@ class Harness {
                 continue;
             }
             this.elements[spec.slot] = element;
-            // Subscribe element events (bind slot as source).
-            for (const name of ELEMENT_EVENTS) {
-                element.on(name, (payload) => this._pushEvent(spec.slot, name, payload));
-            }
+            // Subscribe element events, filtered by this element's elementId so a
+            // shared transport does not cross-record sibling elements' events.
+            this._subscribeElementEvents(spec.slot, element);
             if (!willMount) {
                 mountStatus[spec.slot] = 'skipped';
                 continue;
@@ -280,9 +319,7 @@ class Harness {
             return { ok: false, error: err, slot: spec.slot };
         }
         this.elements[spec.slot] = element;
-        for (const name of ELEMENT_EVENTS) {
-            element.on(name, (payload) => this._pushEvent(spec.slot, name, payload));
-        }
+        this._subscribeElementEvents(spec.slot, element);
         if (spec.mount !== false) {
             try {
                 await element.mount(spec.slot);

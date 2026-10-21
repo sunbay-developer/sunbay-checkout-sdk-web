@@ -1,54 +1,60 @@
-# 运行指南（RUNNING.md）
+# Running guide (RUNNING.md)
 
-> 如何起环境、跑真机 e2e、看结果，以及 AI 调度闭环说明。
-> 规格见 `README.md` / `harness-design.md` / `test-cases.md`。
+> How to start the environment, run the real-device e2e suite, read results, and
+> the AI regression loop. For the spec see `README.md` / `harness-design.md` /
+> `test-cases.md`.
 
 ---
 
-## 1. 一次性准备
+## 1. One-time setup
 
 ```bash
-# 在 SDK 仓库根（checkout-sdk-web/）安装 workspace 依赖（含 test-e2e）
+# From the SDK repo root (checkout-sdk-web/), install workspace deps (incl. test-e2e)
 pnpm install
 
-# 构建 SDK IIFE 产物（harness 页通过 <script> 加载 js/dist/index.global.js）
+# Build the SDK IIFE artifact (the harness loads js/dist/index.global.js via <script>)
 pnpm --filter @sunbay/checkout-sdk-js run build
 
-# 安装 Playwright 浏览器（Chromium）
+# Install the Playwright browser (Chromium)
 pnpm --filter @sunbay/checkout-sdk-e2e run install:browsers
 ```
 
-配置沙箱商户密钥（真实建单所需；缺失时 session 依赖用例自动跳过）：
+Configure the sandbox merchant credentials (needed for real session creation;
+session-dependent cases auto-skip when absent):
 
 ```bash
 cd test-e2e
 cp .env.example .env.local
-# 编辑 .env.local：填入沙箱 API_KEY / APP_ID / MERCHANT_ID
+# Edit .env.local: fill in sandbox API_KEY / APP_ID / MERCHANT_ID
 ```
 
-> `.env.local` 已在 `.gitignore`，不会提交。密钥只在测试后端服务端使用，绝不下发浏览器。
+> `.env.local` is in `.gitignore` and is never committed. The credentials are
+> used only on the test backend server side and never reach the browser.
+> `server/server.mjs` loads `.env.local` first.
 
 ---
 
-## 2. 起依赖服务
+## 2. Start dependencies
 
-真机 e2e 需要两个 origin：
+Real-device e2e needs two origins:
 
-| 服务 | 默认地址 | 谁来起 |
+| Service | Default | Who starts it |
 |---|---|---|
-| hosted runtime（checkout 仓） | `http://localhost:3000` | 手动：checkout 仓 `npm run dev` |
-| 测试后端 + harness 宿主页 | `http://localhost:8090` | **Playwright 自动起**（`webServer`），也可手动 `pnpm --filter @sunbay/checkout-sdk-e2e run server` |
+| hosted runtime (checkout repo) | `http://localhost:3000` | Manually: `npm run dev` in the checkout repo |
+| test backend + harness page | `http://localhost:8090` | **Playwright starts it automatically** (`webServer`); or manually `pnpm --filter @sunbay/checkout-sdk-e2e run server` |
 
-检查 hosted 是否在跑：
+Check the hosted runtime is up:
 
 ```bash
-curl -s http://localhost:3000/healthz   # 期望 200
+curl -s http://localhost:3000/healthz   # expect 200
 ```
 
-> 若 hosted 未起，session/挂载类用例会失败（不是跳过）。错误路径用例（C1-04）用不可达端口，不依赖 hosted。
-> 端口 8090 可被占用；如需改，设 `E2E_HARNESS_ORIGIN` 与后端 `PORT`（见 `.env.example`）。
+> If hosted is down, session/mount cases fail (not skip). The error-path case
+> C1-04 uses an unreachable port and does not depend on hosted.
+> Port 8090 may be in use; to change it set `E2E_HARNESS_ORIGIN` and the backend
+> `PORT` (see `.env.example`).
 
-可选桩（仅 C1-03 PROTOCOL_UNSUPPORTED 需要）：
+Optional stub (only for C1-03 PROTOCOL_UNSUPPORTED):
 
 ```bash
 pnpm --filter @sunbay/checkout-sdk-e2e run stub   # http://localhost:8099
@@ -56,97 +62,108 @@ pnpm --filter @sunbay/checkout-sdk-e2e run stub   # http://localhost:8099
 
 ---
 
-## 3. 跑测试
+## 3. Run the tests
 
 ```bash
 cd test-e2e
 
-# 全部 46 条
+# All 46 cases
 pnpm test
 
-# 分级（按标签过滤）
-pnpm test:p0            # 仅 P0（冒烟/发布必过）
-pnpm test:p1            # 仅 P1
+# By priority (tag filter)
+pnpm test:p0            # P0 only (smoke / must-pass on release)
+pnpm test:p1            # P1 only
 pnpm exec playwright test --grep @p2
-pnpm exec playwright test --grep @c4         # 仅某类（C1..C7）
-pnpm exec playwright test --grep-invert @optional   # 排除可选集（错误路径/钱包拉起）
+pnpm exec playwright test --grep @c4         # a single category (C1..C7)
+pnpm exec playwright test --grep-invert @optional   # exclude the optional set (error paths / wallet invoke)
 
-# 单用例（按标题关键字）
+# A single case (by title keyword)
 pnpm exec playwright test --grep "C2-02"
 
-# 单文件
+# A single file
 pnpm exec playwright test tests/c4-theming.spec.ts
 
-# 调试
-pnpm test:headed       # 带浏览器界面
-pnpm test:ui           # Playwright UI 模式
+# Browser visibility — runs HEADED by default so you can observe. For CI:
+E2E_HEADLESS=1 pnpm test
+# Adjust the headed slow-motion (ms) with E2E_SLOWMO (default 250)
+E2E_SLOWMO=0 pnpm test
 ```
 
-跳过逻辑（自动）：
-- 无沙箱密钥 → 所有 session 依赖用例 **skip**（C1-02 等 credential-free 用例仍跑）。
-- 无 stub runtime → C1-03 **skip**。
-- 无 Apple/Google Pay 能力环境 → C6-05 **skip**（钱包不可用属预期）。
+Auto-skip logic:
+- No sandbox credentials → all session-dependent cases **skip** (credential-free
+  cases such as C1-02 still run).
+- No stub runtime → C1-03 **skips**.
+- No Apple/Google Pay capable environment → C6-05 **skips** (wallet unavailable
+  is expected).
 
 ---
 
-## 4. 看结果
+## 4. Read results
 
-- **终端**：`list` reporter 实时打印每条 pass/skip/fail。
-- **HTML 报告**：`pnpm --filter @sunbay/checkout-sdk-e2e run report`（打开 `playwright-report/`）。失败附 trace / 截图 / 录像。
-- **机读 JSON**：`playwright-report/results.json`（供 AI 解析每条用例结果、定位失败）。
-
----
-
-## 5. AI 调度闭环
-
-这套体系设计为可被 AI 自动调度的回归闭环：
-
-1. **跑**：AI 执行 `pnpm test`（或分级 `--grep @p0`），读 `playwright-report/results.json`。
-2. **判读**：按用例 id（C1-01…C7-10）定位 pass/fail/skip；失败项读 trace/截图/错误断言。
-3. **归因**：
-   - 断言失败 → SDK/hosted 行为与规格不符 → 定位到 `test-cases.md` 对应用例的 expected/assertions。
-   - skip → 环境条件未满足（密钥/桩/钱包），非缺陷。
-4. **修复**：改 SDK（`js/src`）或 hosted（checkout 仓 `src/sdk-runtime`），重建产物。
-5. **重测**：重跑该用例（`--grep "C4-03"`）→ 绿 → 扩跑同类 → 全量回归。
-
-**新增 SDK 功能时**：
-1. 在 `test-cases.md` 增加结构化用例（沿用模板 + 标记）。
-2. 在对应 `tests/c*-*.spec.ts` 增加一个 `test(... @pX @cN ...)`，必要时在 `harness.mjs` / `support/harness.ts` 加钩子/帮助。
-3. 跑新用例 → 绿 → 纳入回归。
-
-这样 feature → case → 真机测试 → AI 发现缺陷 → 修复 → 重测形成闭环。
+- **Terminal**: the `list` reporter prints each pass/skip/fail live.
+- **HTML report**: `pnpm --filter @sunbay/checkout-sdk-e2e run report` (opens
+  `playwright-report/`). Failures attach trace / screenshot / video.
+- **Machine-readable JSON**: `playwright-report/results.json` (for an AI to parse
+  per-case results and locate failures).
 
 ---
 
-## 6. 目录结构
+## 5. AI regression loop
+
+This suite is designed as an AI-driven regression loop:
+
+1. **Run**: `pnpm test` (or tiered `--grep @p0`), read `playwright-report/results.json`.
+2. **Interpret**: locate pass/fail/skip by case id (C1-01…C7-10); for failures,
+   read the trace/screenshot/assertion error.
+3. **Attribute**:
+   - Assertion failure → SDK/hosted behavior diverges from spec → map to the
+     case's expected/assertions in `test-cases.md`.
+   - Skip → an environment condition is unmet (credentials/stub/wallet), not a defect.
+4. **Fix**: change the SDK (`js/src`) or hosted (`checkout` repo `src/sdk-runtime`),
+   rebuild the artifact.
+5. **Re-test**: re-run the case (`--grep "C4-03"`) → green → expand to the
+   category → full regression.
+
+**When adding an SDK feature**:
+1. Add a structured case to `test-cases.md` (same template + markers).
+2. Add a `test(... @pX @cN ...)` to the matching `tests/c*-*.spec.ts`, adding
+   hooks/helpers in `harness.mjs` / `support/harness.ts` if needed.
+3. Run the new case → green → fold into regression.
+
+This closes the loop: feature → case → real-device test → AI finds defect → fix
+→ re-test.
+
+---
+
+## 6. Directory layout
 
 ```
 test-e2e/
-├── README.md               规格总览、三层架构、标记体系
-├── harness-design.md       harness 钩子契约、断言取数、跨源约定
-├── test-cases.md           46 条结构化用例（蓝图）
-├── RUNNING.md              本文件
-├── package.json            @sunbay/checkout-sdk-e2e（workspace 包，不发布）
-├── playwright.config.ts    自动起测试后端、reporter、超时
+├── README.md               Spec overview, three-layer architecture, markers
+├── harness-design.md       Harness hook contract, assertion data sources, cross-origin rules
+├── test-cases.md           46 structured cases (blueprint)
+├── RUNNING.md              This file
+├── package.json            @sunbay/checkout-sdk-e2e (workspace package, not published)
+├── playwright.config.ts    Auto-starts the test backend, reporters, timeouts, headed default
 ├── tsconfig.json
-├── .env.example            密钥模板（复制为 .env.local）
+├── .env.example            Credentials template (copy to .env.local)
 ├── server/
-│   ├── server.mjs          测试后端：建单 + 静态服务 harness/dist + /healthz
-│   └── stub-runtime.mjs     可选伪 hello 端点（PROTOCOL_UNSUPPORTED）
+│   ├── server.mjs          Test backend: create-session + static serve harness/dist + /healthz
+│   └── stub-runtime.mjs    Optional fake hello endpoint (PROTOCOL_UNSUPPORTED)
 ├── harness/
-│   ├── harness.html        宿主页（slot 容器 + 加载 SDK IIFE）
-│   └── harness.mjs          window.__sunbayHarness 钩子实现
+│   ├── harness.html        Harness page (slot containers + loads the SDK IIFE)
+│   └── harness.mjs         window.__sunbayHarness implementation
 ├── fixtures/
-│   └── test-cards.ts        沙箱测试卡
+│   └── test-cards.ts       Sandbox test cards
 ├── support/
-│   ├── env.ts              origin 解析 + 健康探测 + 跳过条件
-│   └── harness.ts          Playwright 侧驱动封装 + PCI 扫描 + 填卡助手
+│   ├── env.ts              Origin resolution + health probe + skip conditions
+│   └── harness.ts          Playwright-side driver + PCI scan + card-entry helpers
 └── tests/
-    ├── c1-handshake.spec.ts        C1 (5)
-    ├── c2-embedding.spec.ts        C2 (6)
-    ├── c3-combination.spec.ts      C3 (9)
-    ├── c4-theming.spec.ts          C4 (6)
-    ├── c5-element-customization.spec.ts  C5 (5)
-    ├── c6-wallet-buttons.spec.ts   C6 (5)
-    └── c7-payment-lifecycle.spec.ts C7 (10)
+    ├── c1-handshake.spec.ts            C1 (5)
+    ├── c2-embedding.spec.ts            C2 (6)
+    ├── c3-combination.spec.ts          C3 (9)
+    ├── c4-theming.spec.ts              C4 (6)
+    ├── c5-element-customization.spec.ts C5 (5)
+    ├── c6-wallet-buttons.spec.ts       C6 (5)
+    └── c7-payment-lifecycle.spec.ts    C7 (10)
 ```

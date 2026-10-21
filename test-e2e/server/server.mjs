@@ -11,10 +11,10 @@
  *   3. Expose `GET /healthz`: readiness probe (always 200) used by Playwright's
  *      webServer and by RUNNING.md checks. Reports whether credentials are present.
  *
- * Unlike the old examples server, this one does NOT exit when credentials are
- * missing — it still serves static files and /healthz, so credential-free tests
- * (C1-02, error paths) can run. Session-dependent requests return 503 with a
- * clear message when credentials are absent, and the Playwright layer skips
+ * When credentials are missing this server does NOT exit — it still serves
+ * static files and /healthz, so credential-free tests (C1-02, error paths) can
+ * run. Session-dependent requests return 503 with a clear message when
+ * credentials are absent, and the Playwright layer skips
  * those tests (see support/env.ts).
  *
  * Node 20.6+ (built-in fetch + process.loadEnvFile), zero external deps.

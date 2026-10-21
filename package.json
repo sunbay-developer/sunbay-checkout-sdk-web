@@ -12,7 +12,6 @@
         "test": "pnpm --filter @sunbay/checkout-sdk-protocol --filter @sunbay/checkout-sdk-js run test",
         "test:e2e": "pnpm --filter @sunbay/checkout-sdk-e2e run test",
         "release": "bash scripts/release.sh",
-        "release:dry": "bash scripts/release.sh",
-        "dev:playground": "bash scripts/dev-playground.sh"
+        "release:dry": "bash scripts/release.sh"
     }
 }

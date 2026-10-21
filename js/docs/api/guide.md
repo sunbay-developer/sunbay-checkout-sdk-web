@@ -22,7 +22,7 @@ For the complete, type-by-type API reference see [`api.md`](./api.md).
 8. [Events](#8-events)
 9. [Error handling](#9-error-handling)
 10. [Security & PCI model](#10-security--pci-model)
-11. [End-to-end demo](#11-end-to-end-demo)
+11. [Real-device testing](#11-real-device-testing)
 
 ---
 
@@ -481,32 +481,24 @@ try {
 
 ---
 
-## 11. End-to-end demo
+## 11. Real-device testing
 
-A runnable, standalone-origin merchant demo lives in
-[`js/examples/`](../../examples/README.md). It includes a zero-dependency Node
-server that creates sessions server-side and three HTML pages:
+A real-device (Playwright) end-to-end test suite lives in
+[`test-e2e/`](../../../test-e2e/README.md). It drives the published SDK build
+inside a standalone merchant-page harness against the hosted runtime, covering:
 
-- `merchant-demo.html` — full integration loop (split card fields + express →
-  confirm → result).
-- `theme-demo.html` — `colorScheme` light/dark, including runtime switching via
-  `updateCheckout`.
-- `customization-playground.html` — exercises the entire theming surface
-  (`colorScheme`, `appearance.variables`, `appearance.rules`) and the express
-  wallet options on a real device.
+- Handshake / initialization and the `window.SunbayCheckout` global.
+- Embedding modes (combined card, split fields, address, express) and element
+  combinations / mutual exclusion.
+- Theming (`colorScheme`, `appearance.variables`, `appearance.rules`) both at
+  init (no-flash via iframe src) and at runtime (`updateCheckout`).
+- Express wallet button options and availability.
+- The card payment flow (confirm → `paymentResult`) with sandbox test cards.
+- The PCI invariant: card values never cross the SDK / parent window / postMessage.
 
-In short:
-
-```bash
-# 1. Run the checkout hosted runtime (separate repo) on :3000
-# 2. Build the SDK
-pnpm --filter @sunbay/checkout-sdk-js run build
-# 3. Configure demo credentials, then start the demo server on :8080
-cp js/examples/.env.example js/examples/.env.local   # fill in merchant credentials
-node js/examples/server.mjs
-```
-
-Then open <http://localhost:8080/examples/merchant-demo.html>.
+See [`test-e2e/RUNNING.md`](../../../test-e2e/RUNNING.md) for how to start the
+test backend + hosted runtime and run the suite (full, by priority, or a single
+case).
 
 > Express wallet buttons require real-device prerequisites (HTTPS + Google test
 > merchant config for Google Pay; Safari + an Apple device with a card + backend

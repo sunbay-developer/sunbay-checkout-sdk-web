@@ -1,0 +1,5 @@
+# Secrets — sandbox merchant credentials, never committed.
+.env.local
+
+# Node.
+node_modules/

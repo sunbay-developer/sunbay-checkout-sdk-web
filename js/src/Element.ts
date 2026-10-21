@@ -507,12 +507,25 @@ export class CheckoutElement {
         const segment = FIELD_TYPES.includes(this.type) ? 'field' : 'element';
         let query = `?checkoutId=${encodeURIComponent(this.checkoutId)}`;
         query += `&elementId=${encodeURIComponent(this.elementId)}`;
+        // address: pass the mode (billing/shipping) through so the hosted page binds the
+        // correct same-origin field channel (address:<mode>). Without it, both address
+        // Elements fall back to the default mode and the second never pairs/readies.
+        if (this.type === 'address') {
+            const mode = (this.options as { mode?: string } | undefined)?.mode;
+            if (mode) {
+                query += `&mode=${encodeURIComponent(mode)}`;
+            }
+        }
         if (this.colorScheme) {
             query += `&colorScheme=${encodeURIComponent(this.colorScheme)}`;
         }
-        // Serialize only when appearance contains variables or rules (avoid an empty appearance string; colorScheme is already passed through separately).
-        if (this.appearance && (this.appearance.variables || this.appearance.rules)) {
-            query += `&appearance=${encodeURIComponent(JSON.stringify(this.appearance))}`;
+        // Effective appearance for the first frame: a per-element appearance (from
+        // create(type, { appearance })) takes precedence over the instance-level appearance
+        // (from createCheckout). Serialize only when it contains variables or rules (avoid an
+        // empty appearance string; colorScheme is passed through separately).
+        const effectiveAppearance = this.perElementAppearance() ?? this.appearance;
+        if (effectiveAppearance && (effectiveAppearance.variables || effectiveAppearance.rules)) {
+            query += `&appearance=${encodeURIComponent(JSON.stringify(effectiveAppearance))}`;
         }
         // expressCheckout: pass the express options from create's second argument (wallet toggles /
         // buttonType / buttonHeight) through to the hosted iframe, so the merchant's configuration
@@ -521,6 +534,16 @@ export class CheckoutElement {
             query += this.resolveExpressQuery();
         }
         return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
+    }
+
+    /**
+     * Extract a per-element appearance (from the Element's own options, i.e. the second
+     * argument of create(type, options)). Returns undefined when absent. Used so per-element
+     * customization (e.g. CardFieldElementOptions.appearance) is honored on the first frame.
+     */
+    private perElementAppearance(): Appearance | undefined {
+        const opts = this.options as { appearance?: Appearance } | undefined;
+        return opts?.appearance;
     }
 
     /**

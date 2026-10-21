@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Theming &amp; customization — Sunbay Checkout SDK</title>
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <main class="page">
+            <nav class="topnav"><a href="/">← All examples</a></nav>
+            <header class="hero">
+                <h1>3 · Theming &amp; customization</h1>
+                <p class="muted">
+                    All three theming layers in one page. Because the fields render in
+                    cross-origin iframes (PCI), arbitrary CSS is not allowed — theming goes
+                    through a controlled <code>appearance</code> contract: whitelisted design
+                    <code>variables</code>, controlled semantic <code>rules</code>, and a
+                    <code>colorScheme</code>. Theming can be applied at init (serialized into
+                    the iframe src, no flash) or hot-reloaded at runtime via
+                    <code>updateCheckout()</code>.
+                </p>
+                <div id="health" class="banner" hidden></div>
+            </header>
+
+            <!-- A: Global theme at init -->
+            <section class="panel">
+                <h2>A · Global theme (init-time)</h2>
+                <p class="muted">
+                    Pass <code>appearance.variables</code> + <code>appearance.colorScheme</code>
+                    to <code>createCheckout()</code>. These 7 whitelisted variables map to the
+                    hosted theme and apply on the first paint.
+                </p>
+                <div class="toolbar">
+                    <label class="inline">
+                        Preset
+                        <select id="preset">
+                            <option value="violet">Violet (light)</option>
+                            <option value="midnight">Midnight (dark)</option>
+                            <option value="forest">Forest (light)</option>
+                        </select>
+                    </label>
+                    <button id="initGlobal">Create &amp; mount with theme</button>
+                    <span id="statusA" class="status"></span>
+                </div>
+                <div class="slot" id="slot-global"></div>
+            </section>
+
+            <!-- B: Element-level config -->
+            <section class="panel">
+                <h2>B · Element rules, express buttons &amp; locale</h2>
+                <p class="muted">
+                    <code>appearance.rules</code> target controlled semantic anchors
+                    (<code>input</code>, <code>input:focus</code>, <code>label</code>, …). Rules
+                    can be set instance-wide (via <code>createCheckout</code>) or per Element (via
+                    the element's own <code>options.appearance</code>) — the two split fields
+                    below each get a different input color to show isolation. The
+                    <code>expressCheckout</code> row shows per-wallet
+                    <code>buttonType</code>/<code>buttonTheme</code> customization, and the
+                    locale buttons switch every mounted Element between English and Chinese via
+                    <code>updateCheckout({ locale })</code>.
+                </p>
+                <div class="toolbar">
+                    <button id="initRules">Create &amp; mount fields + express</button>
+                    <span id="statusB" class="status"></span>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <label class="field-label">cardNumber (red input, per-element)</label>
+                        <div class="slot" id="slot-num"></div>
+                    </div>
+                    <div>
+                        <label class="field-label">cardCvc (blue input, per-element)</label>
+                        <div class="slot" id="slot-cvc"></div>
+                    </div>
+                </div>
+
+                <!-- Express button customization + locale switch. -->
+                <label class="field-label">
+                    expressCheckout (per-wallet buttonType, height 48)
+                </label>
+                <div class="slot" id="slot-express"></div>
+                <p id="express-note" class="muted"></p>
+                <div class="toolbar">
+                    <span class="muted">Locale (updateCheckout):</span>
+                    <button id="localeEn" class="secondary" disabled>English</button>
+                    <button id="localeZh" class="secondary" disabled>中文</button>
+                    <span id="localeCur" class="muted"></span>
+                </div>
+            </section>
+
+            <!-- C: Runtime hot-reload -->
+            <section class="panel">
+                <h2>C · Hot-reload at runtime (updateCheckout)</h2>
+                <p class="muted">
+                    After mounting, call <code>instance.updateCheckout({ appearance })</code> to
+                    restyle every mounted Element live — no remount, no flash. Toggle the color
+                    scheme or push new primary/border-radius variables and watch the card below
+                    update in place.
+                </p>
+                <div class="toolbar">
+                    <button id="initHot">Create &amp; mount card</button>
+                    <span id="statusC" class="status"></span>
+                </div>
+                <div class="slot" id="slot-hot"></div>
+                <div class="toolbar">
+                    <button id="toLight" class="secondary" disabled>colorScheme: light</button>
+                    <button id="toDark" class="secondary" disabled>colorScheme: dark</button>
+                    <button id="varA" class="secondary" disabled>variables: green / 2px</button>
+                    <button id="varB" class="secondary" disabled>variables: orange / 16px</button>
+                    <button id="locale" class="ghost" disabled>locale: zh</button>
+                </div>
+            </section>
+
+            <!-- D: Fine-grained single-element & express button customization -->
+            <section class="panel">
+                <h2>D · Fine-grained customization (single element &amp; express button)</h2>
+                <p class="muted">
+                    A detail-focused playground. Tune the options below, then either
+                    <strong>Apply &amp; mount</strong> (recreates the Element from scratch) or
+                    <strong>Hot-update</strong> (restyles the live Element with no remount / no
+                    flash). For input fields the hot path uses
+                    <code>updateCheckout({ appearance: { rules } })</code> (applied instance-wide
+                    by the hosted runtime). The express button's
+                    <code>buttonType</code>/<code>buttonTheme</code>/<code>buttonHeight</code> are
+                    Element options baked into the iframe, so its Update tries
+                    <code>element.update()</code> and falls back to recreating the iframe (the log
+                    shows which path was taken). Non-whitelisted values are dropped by the hosted
+                    side (PCI-safe).
+                </p>
+
+                <h3>Single card field — appearance.rules</h3>
+                <div class="controls">
+                    <label class="inline">
+                        input font-size
+                        <select id="d-fontsize">
+                            <option value="14px">14px</option>
+                            <option value="16px" selected>16px</option>
+                            <option value="20px">20px</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        input color
+                        <input type="color" id="d-color" value="#0f172a" />
+                    </label>
+                    <label class="inline">
+                        input:focus outline
+                        <input type="color" id="d-focus" value="#2563eb" />
+                    </label>
+                    <label class="inline">
+                        input:invalid color
+                        <input type="color" id="d-invalid" value="#dc2626" />
+                    </label>
+                    <label class="inline">
+                        label weight
+                        <select id="d-labelweight">
+                            <option value="400">400</option>
+                            <option value="600" selected>600</option>
+                            <option value="800">800</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        cardBrand opacity
+                        <select id="d-brand">
+                            <option value="1">1.0</option>
+                            <option value="0.6" selected>0.6</option>
+                            <option value="0.3">0.3</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="toolbar">
+                    <button id="applyField">Apply &amp; mount cardNumber</button>
+                    <button id="hotField" class="secondary" disabled>Hot-update styles</button>
+                    <span id="statusD1" class="status"></span>
+                </div>
+                <div class="slot" id="slot-d-field"></div>
+
+                <h3>Express button — per-wallet detail</h3>
+                <div class="controls">
+                    <label class="inline">
+                        Apple Pay type
+                        <select id="d-ap-type">
+                            <option value="plain">plain</option>
+                            <option value="buy" selected>buy</option>
+                            <option value="check-out">check-out</option>
+                            <option value="book">book</option>
+                            <option value="subscribe">subscribe</option>
+                            <option value="donate">donate</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        Apple Pay theme
+                        <select id="d-ap-theme">
+                            <option value="black" selected>black</option>
+                            <option value="white">white</option>
+                            <option value="white-outline">white-outline</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        Google Pay type
+                        <select id="d-gp-type">
+                            <option value="buy">buy</option>
+                            <option value="pay" selected>pay</option>
+                            <option value="checkout">checkout</option>
+                            <option value="book">book</option>
+                            <option value="subscribe">subscribe</option>
+                            <option value="donate">donate</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        Google Pay theme
+                        <select id="d-gp-theme">
+                            <option value="black">black</option>
+                            <option value="white" selected>white</option>
+                            <option value="default">default</option>
+                        </select>
+                    </label>
+                    <label class="inline">
+                        button height
+                        <input type="range" id="d-height" min="30" max="64" value="48" />
+                        <span id="d-height-val" class="muted">48</span>
+                    </label>
+                    <label class="inline">
+                        max columns
+                        <select id="d-cols">
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="toolbar">
+                    <button id="applyExpress">Apply &amp; mount express</button>
+                    <button id="hotExpress" class="secondary" disabled>Update</button>
+                    <span id="statusD2" class="status"></span>
+                </div>
+                <div class="slot" id="slot-d-express"></div>
+                <p id="d-express-note" class="muted"></p>
+            </section>
+
+            <aside id="logdock" class="logdock collapsed" aria-label="Event log">
+                <div class="logdock-head">
+                    <span class="logdock-title">Event log</span>
+                    <button id="logToggle" class="logdock-toggle" aria-expanded="false">
+                        Expand
+                    </button>
+                </div>
+                <pre id="log" class="log"></pre>
+            </aside>
+        </main>
+
+        <script src="/dist/index.global.js"></script>
+        <script type="module" src="/theming.js"></script>
+    </body>
+</html>

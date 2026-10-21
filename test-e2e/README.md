@@ -1,147 +1,173 @@
-# Checkout Web SDK —— 真机测试用例规格（test-e2e）
+# Checkout Web SDK — Real-device test specification (test-e2e)
 
-> 本目录是对外 Web SDK（`@sunbay/checkout-sdk-js`）的**真机（real-device）测试用例规格**。
-> 它描述「在真实环境里，如何验证对外发布的 SDK 功能都能正常使用」，并作为后续
-> **生成一系列可执行真机测试代码**（每个用例一个）的蓝图 —— 之后 AI 可自动执行这些
-> 用例、读取结果、据此决定下一步动作。
+> This directory holds the **real-device test specification** for the public Web
+> SDK (`@sunbay/checkout-sdk-js`). It describes how, in a real environment, to
+> verify that the published SDK features all work, and it is the blueprint for a
+> generated suite of **executable real-device tests** (one per case) that an AI
+> can later run, read the results of, and act on.
 >
-> 本规格**不是单元测试**。单元/集成测试已由 `js/test/*`（Vitest + jsdom）与 checkout
-> 仓 `src/sdk-runtime/*` 覆盖。真机测试跑**真实浏览器 + 真实跨源 iframe + 真实建单**，
-> 补齐 jsdom 覆盖不到的跨源 postMessage、origin 校验、主题跨 iframe 生效、真实支付链路。
+> This is **not** unit testing. Unit/integration tests are already covered by
+> `js/test/*` (Vitest + jsdom) and the `checkout` repo's `src/sdk-runtime/*`.
+> Real-device tests run a **real browser + real cross-origin iframes + real
+> session creation**, filling the gaps jsdom cannot cover: cross-origin
+> postMessage, origin checks, cross-iframe theming, and the real payment flow.
 
 ---
 
-## 1. 目的与范围
+## 1. Purpose and scope
 
-被测对象是**对外发布的 SDK 公共契约**（见 `js/src/index.ts` 导出）：
+The subject under test is the **public SDK contract** (see `js/src/index.ts`
+exports):
 
-- 入口：`createCheckout(options)` → `CheckoutInstance`，IIFE 产物挂 `window.SunbayCheckout`。
-- `CheckoutInstance`：`create` / `confirm` / `getSession` / `refresh` / `getPaymentStatus`
-  / `updateCheckout` / `on` / `off` / `destroy`。
-- `CheckoutElement`：`mount` / `unmount` / `destroy` / `update` / `on` / `off` /
-  `focus` / `blur` / `clear`（仅输入类）/ `getAvailableWallets`（仅 express）。
-- Element 类型（嵌入模式）：`card` / `cardNumber` / `cardExpiry` / `cardCvc` /
-  `address` / `expressCheckout`。
-- 主题定制：`appearance.colorScheme`（light/dark/auto）、`appearance.variables`
-  （7 个白名单设计变量）、`appearance.rules`（7 个语义 target）；初始（iframe src
-  首帧无闪）与运行时（`updateCheckout`）两条路径。
-- 钱包按钮定制：`expressCheckout` 的 per-wallet `buttonTheme` / `buttonType` 与全局
-  `buttonHeight`、钱包开关。
-- 事件：`ready` / `change` / `focus` / `blur` / `loadError` / `elementReady` /
-  `expressAvailabilityChange` / `paymentStateChange` / `paymentResult` / `error`。
-- 贯穿安全不变式（PCI）：**卡数据绝不经由 SDK / 父窗口 / postMessage 通道**；卡值只在
-  hosted iframe 内本地 RSA 加密后直连后端。
+- Entry: `createCheckout(options)` → `CheckoutInstance`; the IIFE build mounts
+  `window.SunbayCheckout`.
+- `CheckoutInstance`: `create` / `confirm` / `getSession` / `refresh` /
+  `getPaymentStatus` / `updateCheckout` / `on` / `off` / `destroy`.
+- `CheckoutElement`: `mount` / `unmount` / `destroy` / `update` / `on` / `off` /
+  `focus` / `blur` / `clear` (input types only) / `getAvailableWallets` (express
+  only).
+- Element types (embedding modes): `card` / `cardNumber` / `cardExpiry` /
+  `cardCvc` / `address` / `expressCheckout`.
+- Theming: `appearance.colorScheme` (light/dark/auto), `appearance.variables`
+  (7 whitelisted design variables), `appearance.rules` (7 semantic targets);
+  both the init path (iframe src, no-flash first paint) and the runtime path
+  (`updateCheckout`).
+- Wallet button customization: `expressCheckout` per-wallet `buttonTheme` /
+  `buttonType` and global `buttonHeight`, plus wallet toggles.
+- Events: `ready` / `change` / `focus` / `blur` / `loadError` / `elementReady` /
+  `expressAvailabilityChange` / `paymentStateChange` / `paymentResult` / `error`.
+- The cross-cutting security invariant (PCI): **card data never crosses the SDK
+  / parent window / postMessage channel**; card values are RSA-encrypted locally
+  inside the hosted iframe and sent directly to the backend.
 
-**不在本规格范围内**（由已有单测保证）：钱包 `buttonType` / `buttonTheme` 的官方全集
-逐值映射（`parseExpressOptions` / `resolveWalletButtonTheme`）、纯逻辑工具函数、
-appearance 白名单校验器的穷举分支。真机只验「配置是否正确透传并在真实 iframe 生效」。
+**Out of scope** (covered by existing unit tests): exhaustive value-by-value
+mapping of wallet `buttonType` / `buttonTheme` (`parseExpressOptions` /
+`resolveWalletButtonTheme`), pure utility functions, and every branch of the
+appearance whitelist validators. Real-device tests only verify that config is
+correctly passed through and takes effect in a real iframe.
 
 ---
 
-## 2. 三层架构（真实环境模拟）
+## 2. Three-layer architecture (real-environment simulation)
 
-真机测试沿用「三角色、三 origin」的真实跨源模型（与被删除的 `js/examples/` 同构，但
-测试基础设施独立于 `examples/`，常驻于本 `test-e2e/` 目录）：
+Real-device tests use a "three roles, three origins" real cross-origin model.
+The test infrastructure is self-contained in this `test-e2e/` directory.
 
 ```
-测试宿主页 (test harness)        测试后端 (test-e2e server)        Sunbay 平台 + hosted runtime
-  标准商户页模拟器                 持沙箱商户密钥建单                 建单 API / /sdk/main
-  独立 origin（默认 :8090）         /api/create-session              /sdk/field/* /sdk/element/*
-        │                              │  （密钥只在服务端）             （hosted runtime，默认 :3000）
-        │ ① POST /api/create-session   │                                      │
-        │─────────────────────────────▶│                                      │
-        │                              │ ② 用沙箱密钥建单 ──────────────────────▶│
-        │ ③ { sessionId } ◀─────────────│◀──────────── { sessionId } ───────────│
-        │                                                                      │
-        │ ④ window.__sunbayHarness.setup(用例配置)                              │
-        │      → createCheckout({ sessionId, hostOrigin })                     │
-        │      → 隐藏 main iframe + 可见 field/element iframe（全部 hosted 托管）│
-        │ ⑤ 浏览器自动化驱动 + 读取 events / parentMessages / DOM 断言           │
-        ▼
-   （卡值仅存在于 hosted iframe 内，父窗口/SDK 全程不触碰）
+Test harness page            Test backend                 Sunbay platform + hosted runtime
+  standard merchant-page        creates sessions with         create-session API / /sdk/main
+  simulator                     the sandbox merchant key       /sdk/field/* /sdk/element/*
+  standalone origin (:8090)     /api/create-session           (hosted runtime, default :3000)
+        |                          |  (key stays server-side)            |
+        | (1) POST /api/create-session                                   |
+        |------------------------->|                                     |
+        |                          | (2) create session w/ key --------->|
+        | (3) { sessionId } <-------|<------------ { sessionId } ---------|
+        |                                                                |
+        | (4) window.__sunbayHarness.setup(case config)                  |
+        |      -> createCheckout({ sessionId, hostOrigin })              |
+        |      -> hidden main iframe + visible field/element iframes      |
+        |         (all hosted by the runtime)                            |
+        | (5) browser automation drives + reads events/parentMessages/DOM |
+        v
+   (card values exist only inside the hosted iframes; the parent/SDK never touch them)
 ```
 
-三个 origin 必须**互不同源**，才能真实覆盖跨源 postMessage、`event.origin` 校验、
-跨 iframe 信令频道：
+The three origins must be **mutually non-same-origin** to genuinely cover
+cross-origin postMessage, `event.origin` checks, and cross-iframe channels:
 
-- 测试宿主页 + 测试后端：同一 origin（默认 `http://localhost:8090`）。
-- hosted runtime：另一 origin（默认 `http://localhost:3000`，即 checkout 仓 `npm run dev`；
-  或指向真实已部署的 hosted 环境）。
+- Test harness page + test backend: same origin (default `http://localhost:8090`).
+- Hosted runtime: a different origin (default `http://localhost:3000`, i.e. the
+  `checkout` repo's `npm run dev`; or a deployed real environment).
 
-> 为什么不在 checkout 仓内验证：hosted 页与真实商户页**不同源**，只有独立 origin 的宿主页
-> 才能真实覆盖 SDK 的跨源行为。这也是测试宿主页必须独立存在的原因。
-
----
-
-## 3. 运行前置
-
-1. **hosted runtime 可达**：提供 `/sdk/main`、`/sdk/field/<type>`、`/sdk/element/<type>`。
-   本地可用 checkout 仓 `npm run dev`（:3000）；也可指向真实部署环境。
-   > 长驻进程（dev server）由人工启动，测试执行器不在后台启动它。
-2. **SDK IIFE 产物已构建**：`js/dist/index.global.js`（`pnpm --filter @sunbay/checkout-sdk-js run build`）。
-   测试宿主页通过 `<script>` 加载**真实对外产物**（而非源码），保证测的是发布形态。
-3. **测试后端可建沙箱单**：`test-e2e/server`（沿用 examples 的 `server.mjs` 模式）持
-   **沙箱商户密钥**，暴露 `POST /api/create-session` 返回 `sessionId`。密钥只在服务端，
-   从 `.env.local`（git-ignore）读取，浏览器永不接触。
-4. **沙箱测试卡**：功能测试用，见 `fixtures/test-cards.ts`（公开测试数据，明文）。
+> Why not verify this inside the `checkout` repo: the hosted page and a real
+> merchant page are **not same-origin**. Only a standalone-origin harness can
+> genuinely exercise the SDK's cross-origin behavior — which is why the harness
+> must exist independently.
 
 ---
 
-## 4. 执行约定（供 AI 自动执行）
+## 3. Prerequisites
 
-每个用例是一个**结构化条目**（模板见 `test-cases.md` §1），字段可直接映射为一次浏览器
-自动化执行：
-
-- `harness-config` → 调 `window.__sunbayHarness.setup(config)` 声明式构造场景。
-- `steps` → 有序的浏览器动作（导航 / 填值 / 点击 / 调钩子方法）。
-- `expected` / `assertions` → 通过 `evaluate_script` 读取 `__sunbayHarness.events`、
-  `__sunbayHarness.parentMessages`、`instance` / `elements` 状态与 DOM/计算样式判定 pass/fail。
-- `cleanup` → 调 `destroy()` / `reset()` 复位，保证用例间无状态残留。
-
-**卡值输入**（涉及支付链路的用例）**不经钩子**：由浏览器自动化**直接向 hosted 的
-`cardNumber` / `cardExpiry` / `cardCvc` iframe 内输入**（跨 iframe 操作），harness 只提供
-容器定位。断言反向校验「父窗口 `parentMessages` / `events` 不含该卡号」。
+1. **Hosted runtime reachable**, serving `/sdk/main`, `/sdk/field/<type>`,
+   `/sdk/element/<type>`. Locally use the `checkout` repo's `npm run dev` (:3000);
+   or point at a deployed environment.
+   > Long-running processes (dev server) are started manually by the user; the
+   > test runner does not start them in the background.
+2. **SDK IIFE build present**: `js/dist/index.global.js`
+   (`pnpm --filter @sunbay/checkout-sdk-js run build`). The harness loads the
+   **real published artifact** (not source), so it tests the shipped form.
+3. **Test backend can create sandbox sessions**: `test-e2e/server` holds the
+   **sandbox merchant credentials** and exposes `POST /api/create-session`
+   returning a `sessionId`. Credentials stay on the server, read from `.env.local`
+   (git-ignored); the browser never sees them.
+4. **Sandbox test cards** for functional tests: see `fixtures/test-cards.ts`
+   (public test data, plaintext).
 
 ---
 
-## 5. 优先级与可选标记体系
+## 4. Execution model (for AI-driven runs)
 
-每个用例带以下标记，供执行器分层编排与自动跳过：
+Each case is a **structured entry** (template in `test-cases.md` §1) that maps
+directly to a browser-automation run:
 
-**优先级（priority）**
+- `harness-config` → call `window.__sunbayHarness.setup(config)` to build the
+  scenario declaratively.
+- `steps` → ordered browser actions (navigate / fill / click / call hook methods).
+- `expected` / `assertions` → read `__sunbayHarness.events`,
+  `__sunbayHarness.parentMessages`, `instance` / `elements` state, and
+  DOM/computed styles via `evaluate_script` to decide pass/fail.
+- `cleanup` → call `destroy()` / `reset()` to reset, ensuring no cross-case state.
 
-| 级别 | 含义 | 建议编排 |
+**Card entry** (for payment-flow cases) does **not** go through the hooks: the
+browser automation types directly into the hosted `cardNumber` / `cardExpiry` /
+`cardCvc` iframes (cross-iframe); the harness only provides container anchors.
+Assertions then verify the parent window's `parentMessages` / `events` contain
+no card number.
+
+---
+
+## 5. Priority and condition markers
+
+Each case carries the following markers for tiered orchestration and auto-skip.
+
+**Priority**
+
+| Level | Meaning | Suggested orchestration |
 |---|---|---|
-| P0 | 核心对外能力，发布必过 | 每次回归必跑 |
-| P1 | 重要能力/常见组合 | 每次回归必跑 |
-| P2 | 边界/增强/较少用 | 完整回归跑，快速回归可略 |
+| P0 | Core public capability; must pass on release | Every regression run |
+| P1 | Important capability / common combination | Every regression run |
+| P2 | Edge / enhancement / less common | Full regression; may skip on quick runs |
 
-**真机条件（real-device-condition）** —— 标记用例对特殊环境的依赖；不满足时**按预期跳过，
-不记为失败**：
+**Real-device condition** — marks a case's dependency on a special environment;
+when unmet it is **skipped as expected, not failed**:
 
-| 标记 | 含义 | 不满足时的预期 |
+| Marker | Meaning | Expected when unmet |
 |---|---|---|
-| `none` | 普通浏览器即可 | —— |
-| `requires-apple-pay` | Safari + Apple 设备 + 后端 Apple 证书/域名验证 | 按钮不渲染、`availableWallets.applePay=false` 属预期 |
-| `requires-google-pay` | HTTPS 测试域 + Google 测试商户配置 | 按钮不渲染、`availableWallets.googlePay=false` 属预期 |
-| `requires-blackhole` | 需一个不回 hello 的不可达 hostOrigin（如 `http://127.0.0.1:59999`） | —— |
-| `requires-stub-runtime` | 需 `test-e2e/` 提供的伪 hello 端点（回不含当前 PROTOCOL_MAJOR 的 RuntimeHello） | 无桩时该用例不在真机范围，由已有单测保证 |
-| `requires-session-variant` | 需能建出特定标记的 session（如 `collectShippingAddress:true`） | 沙箱无法控制时降级为「仅断言 session 视图字段透传」 |
-| `requires-payment-flow` | 需 hosted runtime 真实支付链路（沙箱扣款） | —— |
+| `none` | A plain browser suffices | — |
+| `requires-apple-pay` | Safari + Apple device + backend Apple certs/domain verification | Button not rendered, `availableWallets.applePay=false` is expected |
+| `requires-google-pay` | HTTPS test domain + Google test merchant config | Button not rendered, `availableWallets.googlePay=false` is expected |
+| `requires-blackhole` | An unreachable hostOrigin that never replies with hello (e.g. `http://127.0.0.1:59999`) | — |
+| `requires-stub-runtime` | The `test-e2e/` stub hello endpoint (replies with a RuntimeHello that excludes the current PROTOCOL_MAJOR) | Without the stub the case leaves real-device scope and is covered by unit tests |
+| `requires-session-variant` | Ability to create a session with a specific flag (e.g. `collectShippingAddress:true`) | When the sandbox cannot control it, degrade to "assert session-view field pass-through only" |
+| `requires-payment-flow` | A real payment flow through the hosted runtime (sandbox) | — |
 
-**可选集（optional）**：错误路径（`PROTOCOL_UNSUPPORTED` / `RUNTIME_LOAD_FAILED`）与
-钱包实际拉起用例归入可选集，日常自动回归可按标记跳过，单独编排验证。
+**Optional set**: error-path cases (`PROTOCOL_UNSUPPORTED` / `RUNTIME_LOAD_FAILED`)
+and the actual-wallet-invocation case are grouped as optional; a daily automated
+regression may skip them by marker and orchestrate them separately.
 
 ---
 
-## 6. 目录内容
+## 6. Directory contents
 
-| 文件 | 说明 |
+| File | Description |
 |---|---|
-| `README.md` | 本文件：目的、三层架构、前置、执行约定、标记体系 |
-| `harness-design.md` | 测试宿主页 + `window.__sunbayHarness` 钩子契约、事件/postMessage 记录器、跨 iframe 填卡约定、桩/后端约定 |
-| `test-cases.md` | 46 条结构化用例（C1–C7）+ 统一模板 + 贯穿 PCI 断言 |
-| `fixtures/test-cards.ts` | 沙箱测试卡常量（功能测试用，公开数据） |
-
-> 后续会在本目录新增可执行测试代码（每用例一个）与测试宿主页/测试后端实现。本规格先定
-> 契约与用例，不含实现代码。
+| `README.md` | This file: purpose, three-layer architecture, prerequisites, execution model, markers |
+| `harness-design.md` | Harness page + `window.__sunbayHarness` hook contract, assertion data sources, cross-origin rules, card-entry convention, stub/backend conventions |
+| `test-cases.md` | 46 structured cases (C1–C7) + unified template + cross-cutting PCI assertion |
+| `RUNNING.md` | How to run: start services, run full/by-priority/single, read results, AI loop |
+| `fixtures/test-cards.ts` | Sandbox test cards (public functional-test data) |
+| `server/` | Test backend + optional stub runtime |
+| `harness/` | Harness page + `window.__sunbayHarness` implementation |
+| `support/` | Playwright-side driver, PCI scan, card-entry helpers, skip conditions |
+| `tests/` | The 46 executable Playwright specs (one test per case) |

@@ -51,24 +51,14 @@ checkout.on('paymentResult', (evt) => console.log(evt));
 const outcome = await checkout.confirm();
 ```
 
-## End-to-end demo
+## Real-device testing
 
-A runnable merchant demo (standalone origin + server-side session creation)
-lives in [`js/examples/`](./js/examples/README.md). In short:
-
-```bash
-# 1. Run the checkout hosted runtime (separate repo) on :3000
-# 2. Build the SDK
-pnpm --filter @sunbay/checkout-sdk-js run build
-# 3. Configure demo credentials, then start the demo server on :8080
-cp js/examples/.env.example js/examples/.env.local   # fill in merchant credentials
-node js/examples/server.mjs
-```
-
-Then open http://localhost:8080/examples/merchant-demo.html.
-
-> Demo merchant credentials are read from `js/examples/.env.local` (git-ignored).
-> Never commit real credentials.
+A real-device (Playwright) end-to-end test suite lives in
+[`test-e2e/`](./test-e2e/README.md). It drives the published SDK build inside a
+standalone merchant-page harness against the hosted runtime, covering embedding
+modes, element combinations, theming/element customization, the payment flow,
+and the PCI card-isolation invariant. See
+[`test-e2e/RUNNING.md`](./test-e2e/RUNNING.md) for how to run it.
 
 ## Documentation
 

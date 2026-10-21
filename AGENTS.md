@@ -57,12 +57,13 @@ checkout-sdk-web/
   **never carry card data** (plaintext or ciphertext). Card data is encrypted
   locally with an RSA public key only inside the hosted-runtime page and sent
   directly to the backend.
-- **English-only code (强制)**: all code in this repo — identifiers, **comments,
+- **English-only code (mandatory)**: all code in this repo — identifiers, **comments,
   JSDoc, test `describe`/`it` descriptions, and in-code strings** — **must be in
   English**. This SDK is an outward-facing published package; Chinese is not
   allowed in `protocol/` and `js/` sources/tests/config. Exceptions: Markdown
-  docs (`docs/`, `*.md`, specs) and the `examples/` directory (demo, slated for
-  removal) are not bound by this rule. When editing or adding code, write English
+  docs (`docs/`, `*.md`, specs) are not bound by this rule. The `test-e2e/`
+  suite is test infrastructure (not published) and also uses English code and
+  comments. When editing or adding code, write English
   comments/JSDoc; do not introduce Chinese. Quick residual check:
   `grep -rl $'[\u4e00-\u9fff]' protocol/src js/src js/test` should return nothing.
 
@@ -111,57 +112,77 @@ pnpm --filter @sunbay/checkout-sdk-js run build
   publish to the official registry (`https://registry.npmjs.org`), both with
   `publishConfig.access = public`. Published history: 0.0.1 (protocol) → **0.0.2
   (both, lockstep)**.
-- **Lockstep versioning（强制）**：两包**始终同版本号**。任一包发版时两包一起升到同一
-  版本并同时发布（即使某包无改动也陪升）。好处：心智只记一个版本，`js@x ⇄ protocol@x`
-  一目了然；js 的 `dependencies` 固定引用同版本 protocol。
-- **一键发布（固化脚本）**：`pnpm release <version>`（= `bash scripts/release.sh`）。
-  脚本自动：两包升版本 → build → type-check+test 门禁 → 发布。先 protocol 后 js。
-  dry-run：`pnpm release <version> --dry-run`（只 build+pack 校验，不实发；会临时改 package.json
-  版本，之后 `git checkout protocol/package.json js/package.json` 还原）。
-  发布后手动收尾：git 提交两包版本改动并 push；到 `checkout` 仓 bump 依赖 `^<version>` +
-  `npm install` 锁 lockfile。
-- **发布实操正解（脚本已封装，手动发时务必照此，否则必失败）**：
-  - **不要直接 `pnpm publish`**：本机全局 `~/.npmrc` 的 `registry` 指向淘宝镜像
-    （`registry.npmmirror.com`，只读），`pnpm publish` 会误发到镜像并 401/404。
-  - **不要直接 `npm publish`（对 js）**：js 依赖 `@sunbay/checkout-sdk-protocol: workspace:*`，
-    `npm publish` 不会替换 `workspace:*`，商户 `npm install` 解析不了。
-  - **正解 = `pnpm pack` + `npm publish <tarball>`**：`pnpm pack` 自动把 `workspace:*`
-    替换为已发布的实际版本并生成 tarball；再用显式参数发布该 tarball：
-    `npm publish <tgz> --registry https://registry.npmjs.org --//registry.npmjs.org/:_authToken="$SUNBAY_NPM_TOKEN" --access public`。
-    （协议 npm view 可能有几分钟索引传播延迟，属正常。）
+- **Lockstep versioning (mandatory)**: the two packages **always share the same
+  version number**. When either package is released, both are bumped to the same
+  version and published together (a package with no changes still gets bumped
+  along). Benefit: you only have to remember one version, `js@x ⇄ protocol@x` is
+  obvious at a glance, and js's `dependencies` always pins the same-version
+  protocol.
+- **One-command release (fixed script)**: `pnpm release <version>` (=
+  `bash scripts/release.sh`). The script automatically: bumps both package
+  versions → build → type-check + test gate → publish. Protocol first, then js.
+  Dry-run: `pnpm release <version> --dry-run` (build + pack validation only, no
+  actual publish; it temporarily edits the package.json versions, then restore
+  them afterward with `git checkout protocol/package.json js/package.json`).
+  Manual follow-up after release: git commit the version changes in both packages
+  and push; in the `checkout` repo bump the dependency to `^<version>` +
+  `npm install` to lock the lockfile.
+- **Correct publishing procedure (the script wraps this; when publishing by hand
+  you must follow it exactly, otherwise it will fail)**:
+  - **Do not run `pnpm publish` directly**: this machine's global `~/.npmrc` has
+    `registry` pointing at the Taobao mirror (`registry.npmmirror.com`,
+    read-only), so `pnpm publish` would wrongly target the mirror and return
+    401/404.
+  - **Do not run `npm publish` directly (for js)**: js depends on
+    `@sunbay/checkout-sdk-protocol: workspace:*`, and `npm publish` does not
+    replace `workspace:*`, so a merchant's `npm install` cannot resolve it.
+  - **Correct approach = `pnpm pack` + `npm publish <tarball>`**: `pnpm pack`
+    automatically replaces `workspace:*` with the actual published version and
+    produces a tarball; then publish that tarball with explicit arguments:
+    `npm publish <tgz> --registry https://registry.npmjs.org --//registry.npmjs.org/:_authToken="$SUNBAY_NPM_TOKEN" --access public`.
+    (The protocol may take a few minutes to appear in `npm view` due to index
+    propagation delay; this is normal.)
 - **semver discipline**:
   - Any **breaking protocol change** in protocol (removing/altering envelope
     fields, commands, events, or error-code semantics) → **bump major** and bump
     `PROTOCOL_MAJOR` in sync; the runtime handshake rejects incompatible peers.
   - Backward-compatible additions → minor; fixes/docs → patch.
-  - 0.0.x 早期阶段 lockstep patch 递增即可；runtime 兼容最终由握手 `PROTOCOL_MAJOR` 裁决。
+  - During the early 0.0.x phase, a lockstep patch bump is enough; runtime
+    compatibility is ultimately decided by the handshake `PROTOCOL_MAJOR`.
 - **Publishing token**: environment variable `SUNBAY_NPM_TOKEN` (granular token,
   Read and write + Bypass 2FA). **Never print, commit, or write the token value
-  into the repo/logs.** 脚本用命令行 `--//registry.npmjs.org/:_authToken=` 传入，
-  绝不持久化 `.npmrc`（若临时写了务必发布后立即删）。
+  into the repo/logs.** The script passes it via the command-line
+  `--//registry.npmjs.org/:_authToken=` argument and never persists an `.npmrc`
+  (if you write one temporarily, delete it immediately after publishing).
 - **Cross-repo `checkout` always consumes the published registry package** (not
-  a symlink), which is safest for Turbopack. 发布新版本后，`checkout` 需 bump 依赖
-  范围 + `npm install --registry https://registry.npmjs.org`（绕镜像）锁 lockfile，
-  CI/干净环境 `npm ci` 才能装到。
+  a symlink), which is safest for Turbopack. After publishing a new version,
+  `checkout` must bump the dependency range + `npm install --registry
+  https://registry.npmjs.org` (bypassing the mirror) to lock the lockfile, so
+  that CI / clean environments can install it with `npm ci`.
 
-### 本地真机联调（playground / demo）
+### Local on-device (real-device) testing
 
-`pnpm dev:playground`（= `bash scripts/dev-playground.sh`）构建 SDK 产物（含 IIFE
-`dist/index.global.js`，供 demo 的 `<script>` 引入）。另两个长驻进程手动起（Agent 不起长驻进程）：
+Real-device tests live in [`test-e2e/`](./test-e2e/README.md) (Playwright). They
+drive the published SDK build inside a standalone merchant-page harness against
+the hosted runtime, covering embedding modes, element combinations / mutual
+exclusion, theming (colorScheme / appearance.variables / appearance.rules, both
+at init and runtime), express wallet options, the card payment flow, and the PCI
+card-isolation invariant.
 
 ```bash
-# 1) checkout hosted（另一终端）
+# 1) checkout hosted runtime (separate terminal; the agent does not start long-running processes)
 cd ../checkout && npm run dev            # :3000
-# 2) 构建 SDK 产物
-pnpm dev:playground
-# 3) demo server（另一终端；首次 cp js/examples/.env.example .env.local 填凭据）
-cd js/examples && node server.mjs        # :8080
-# 打开 http://localhost:8080/examples/customization-playground.html
+# 2) build the SDK artifacts the harness loads (IIFE dist/index.global.js)
+pnpm --filter @sunbay/checkout-sdk-js run build
+# 3) configure sandbox credentials (first time): cp test-e2e/.env.example test-e2e/.env.local and fill them in
+# 4) run the suite (the test backend on :8090 is auto-started by Playwright)
+pnpm test:e2e                            # or, inside test-e2e/, pnpm test / test:p0 / --grep ...
 ```
 
-定制 playground 覆盖全部主题定制真机验证：colorScheme / appearance.variables /
-appearance.rules / 钱包按钮 buttonTheme·buttonType·buttonHeight。跨源（:3000 hosted
-vs :8080 商户页）真实覆盖 SDK 的 postMessage / origin 校验。
+The cross-origin setup (:3000 hosted vs :8090 merchant-page harness) genuinely
+exercises the SDK's postMessage / origin validation / cross-iframe channels.
+See `test-e2e/RUNNING.md` for priority/condition filtering and the AI regression
+loop.
 
 ---
 

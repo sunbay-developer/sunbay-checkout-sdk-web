@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Split fields + address — Sunbay Checkout SDK</title>
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <main class="page">
+            <nav class="topnav"><a href="/">← All examples</a></nav>
+            <header class="hero">
+                <h1>2 · Split fields + address</h1>
+                <p class="muted">
+                    Instead of a single combined <code>card</code>, lay out the three split
+                    fields (<code>cardNumber</code>, <code>cardExpiry</code>,
+                    <code>cardCvc</code>) in separate slots so you control the layout, then add
+                    a billing and a shipping <code>address</code> Element. Split fields and the
+                    combined <code>card</code> are mutually exclusive; each split field type is
+                    a singleton. The shipping address requires a session created with
+                    <code>collectShippingAddress:true</code>. Note the merchant-owned
+                    &ldquo;Delivery options&rdquo; block inserted <em>between</em> the two
+                    address Elements — each Element is an isolated iframe, so you can freely
+                    interleave your own page content.
+                </p>
+                <div id="health" class="banner" hidden></div>
+            </header>
+
+            <section class="panel">
+                <div class="toolbar">
+                    <button id="init">Create session &amp; mount fields</button>
+                    <span id="status" class="status"></span>
+                </div>
+                <p id="summary" class="summary muted"></p>
+
+                <h3>Card</h3>
+                <label class="field-label">Card number</label>
+                <div class="slot" id="slot-num"></div>
+                <div class="row">
+                    <div class="col">
+                        <label class="field-label">Expiry</label>
+                        <div class="slot" id="slot-exp"></div>
+                    </div>
+                    <div class="col">
+                        <label class="field-label">CVC</label>
+                        <div class="slot" id="slot-cvc"></div>
+                    </div>
+                </div>
+
+                <h3>Billing address</h3>
+                <div class="slot" id="slot-bill"></div>
+
+                <!-- Merchant custom area — plain merchant-owned DOM inserted BETWEEN two
+                     address Elements. Because each Element is an isolated iframe, the
+                     merchant fully controls the surrounding page layout and can interleave
+                     its own fields/content freely. These inputs belong to the merchant (not
+                     the SDK) and are submitted via the merchant's own backend. -->
+                <div class="custom-area">
+                    <h3>Delivery options (merchant-owned)</h3>
+                    <p class="muted">
+                        This block is the merchant's own markup placed between the billing and
+                        shipping Elements — proof that each SDK Element is a self-contained
+                        iframe and the merchant owns everything around it.
+                    </p>
+                    <label class="field-label" for="delivery-note">Delivery instructions</label>
+                    <textarea
+                        id="delivery-note"
+                        rows="2"
+                        placeholder="e.g. Leave at the front desk"
+                    ></textarea>
+                    <label class="inline" style="margin-top: 10px">
+                        <input type="checkbox" id="gift-wrap" />
+                        Add gift wrapping (+2.00)
+                    </label>
+                </div>
+
+                <h3>Shipping address</h3>
+                <div class="slot" id="slot-ship"></div>
+                <p id="ship-note" class="muted"></p>
+
+                <div class="toolbar">
+                    <button id="pay" disabled>Pay now</button>
+                    <button id="focusNum" class="ghost" disabled>Focus card number</button>
+                    <button id="destroy" class="ghost" disabled>Destroy instance</button>
+                </div>
+            </section>
+
+            <aside id="logdock" class="logdock collapsed" aria-label="Event log">
+                <div class="logdock-head">
+                    <span class="logdock-title">Event log</span>
+                    <button id="logToggle" class="logdock-toggle" aria-expanded="false">
+                        Expand
+                    </button>
+                </div>
+                <pre id="log" class="log"></pre>
+            </aside>
+        </main>
+
+        <script src="/dist/index.global.js"></script>
+        <script type="module" src="/split-fields.js"></script>
+    </body>
+</html>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Sunbay Checkout SDK — Examples</title>
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <main class="page">
+            <header class="hero">
+                <h1>Sunbay Checkout SDK — Examples</h1>
+                <p class="muted">
+                    Interactive, runnable samples of
+                    <code>@sunbay/checkout-sdk-js</code>. Each page drives the real published
+                    SDK (<code>window.SunbayCheckout</code>) against the hosted runtime, with
+                    a tiny dependency-free backend that creates sessions using a sandbox
+                    merchant key.
+                </p>
+                <div id="health" class="banner" hidden></div>
+            </header>
+
+            <section class="cards">
+                <a class="card-link" href="/full-element.html">
+                    <h2>1 · Full card Element</h2>
+                    <p class="muted">
+                        The simplest embedding: a single combined <code>card</code> Element
+                        (number + expiry + CVC in one iframe), then <code>confirm()</code>.
+                    </p>
+                </a>
+
+                <a class="card-link" href="/split-fields.html">
+                    <h2>2 · Split fields + address</h2>
+                    <p class="muted">
+                        Lay out <code>cardNumber</code> / <code>cardExpiry</code> /
+                        <code>cardCvc</code> in separate slots, combined with a billing and a
+                        shipping <code>address</code> Element.
+                    </p>
+                </a>
+
+                <a class="card-link" href="/theming.html">
+                    <h2>3 · Theming &amp; customization</h2>
+                    <p class="muted">
+                        Global theme (<code>appearance.variables</code>), element-level rules
+                        (<code>appearance.rules</code> &amp; per-element isolation), and live
+                        hot-reload via <code>updateCheckout()</code>.
+                    </p>
+                </a>
+            </section>
+
+            <footer class="foot muted">
+                <p>
+                    Prerequisites: build the SDK
+                    (<code>pnpm --filter @sunbay/checkout-sdk-js run build</code>), start the
+                    hosted runtime (<code>checkout</code> repo's <code>npm run dev</code> on
+                    <code>:3000</code>), and fill <code>example/.env.local</code> with sandbox
+                    credentials. See <code>example/README.md</code>.
+                </p>
+            </footer>
+        </main>
+
+        <script type="module">
+            import { fetchHealth, renderHealthBanner } from '/app.js';
+            renderHealthBanner(await fetchHealth(), document.getElementById('health'));
+        </script>
+    </body>
+</html>
