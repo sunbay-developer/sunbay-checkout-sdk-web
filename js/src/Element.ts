@@ -149,7 +149,7 @@ export class CheckoutElement {
     private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
     /** 初始外观定制（含 variables/rules 时拼进 iframe src；缺省或仅 colorScheme 不拼）。 */
     private readonly appearance: Appearance | undefined;
-    /** 95006bc156de8c03Ff085b9e4f8b6ce85165Ff09Ff1adestroy 6210529f65f6901a77e55b9e4f8b4ece6ce8518c886879fb966481ea8eab3002 */
+    /** 销毁回调（实例注入）：destroy() 末尾调用，使实例从互斥注册表移除自身以释放名额。 */
     private readonly onDestroy: ((elementId: string) => void) | undefined;
 
     private status: ElementStatus = 'created';
