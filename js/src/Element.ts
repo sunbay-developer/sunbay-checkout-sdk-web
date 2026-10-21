@@ -57,6 +57,13 @@ export interface CheckoutElementOptions {
     /** 初始 Element 配置（随 createElement 下发）。 */
     initialOptions?: ElementOptions;
     /**
+     * 句柄销毁回调（由 CheckoutInstance 注入）。`destroy()` 成功销毁时以本 elementId 调用，
+     * 使实例从互斥注册表（elements Map）移除自身，从而允许销毁后重建同类互斥 Element
+     * （如切换 expressCheckout 的 buttonType/buttonHeight 需重建 iframe）。`unmount()` 不调用
+     * （保留句柄、仍占名额、可 remount）。
+     */
+    onDestroy?: (elementId: string) => void;
+    /**
      * 初始配色方案（来自 createCheckout 的 appearance.colorScheme）。
      * 仅当提供时拼进 iframe src 的 `&colorScheme=<值>`，使托管 iframe 在首帧即按该
      * 配色渲染（无闪）。缺省时不拼接，由托管侧按默认（light）处理。运行时切换走
@@ -131,6 +138,8 @@ export class CheckoutElement {
     readonly elementId: string;
     /** Element 类型。 */
     readonly type: ElementType;
+    /** 地址 Element 的 mode（billing/shipping；仅 address 有意义），供实例按 mode 判互斥。 */
+    readonly mode: string | undefined;
 
     private readonly hostOrigin: string;
     private readonly checkoutId: string;
@@ -140,6 +149,8 @@ export class CheckoutElement {
     private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
     /** 初始外观定制（含 variables/rules 时拼进 iframe src；缺省或仅 colorScheme 不拼）。 */
     private readonly appearance: Appearance | undefined;
+    /** 销毁回调（实例注入）：destroy() 末尾调用，使实例从互斥注册表移除自身以释放名额。 */
+    private readonly onDestroy: ((elementId: string) => void) | undefined;
 
     private status: ElementStatus = 'created';
     private container: HTMLElement | null = null;
@@ -174,6 +185,8 @@ export class CheckoutElement {
         this.options = opts.initialOptions;
         this.colorScheme = opts.colorScheme;
         this.appearance = opts.appearance;
+        this.mode = (opts.initialOptions as { mode?: string } | undefined)?.mode;
+        this.onDestroy = opts.onDestroy;
         this.installInputActions();
         this.installExpressAvailability();
     }
@@ -354,6 +367,8 @@ export class CheckoutElement {
         this.removeIframe();
         this.container = null;
         this.status = 'destroyed';
+        // 通知实例从互斥注册表移除自身，释放名额以允许销毁后重建同类互斥 Element。
+        this.onDestroy?.(this.elementId);
     }
 
     /**

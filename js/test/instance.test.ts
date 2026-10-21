@@ -222,6 +222,76 @@ describe('CheckoutInstance.create 互斥', () => {
     });
 });
 
+describe('CheckoutInstance.create 销毁后释放互斥名额（可重建）', () => {
+    it("expressCheckout destroy 后可再 create（不抛 ELEMENT_CONFLICT）", async () => {
+        const { instance } = await bootstrap();
+        const el = instance.create('expressCheckout');
+        el.destroy();
+        // 释放名额后应能重建（如切换 buttonType/buttonHeight 需重建 iframe）。
+        expect(() => instance.create('expressCheckout')).not.toThrow();
+    });
+
+    it("combined card destroy 后可再 create，且互斥随之解除（可转拆分字段）", async () => {
+        const { instance } = await bootstrap();
+        const card = instance.create('card');
+        card.destroy();
+        // 释放名额后可重建同类单例。
+        const card2 = instance.create('card');
+        // card 存在期间与拆分字段互斥。
+        expect(() => instance.create('cardNumber')).toThrowError(
+            expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
+        );
+        // 销毁 card 后，card↔拆分字段互斥解除。
+        card2.destroy();
+        expect(() => instance.create('cardNumber')).not.toThrow();
+    });
+
+    it("拆分字段 destroy 后可再 create 同类型；未销毁时重复仍抛", async () => {
+        const { instance } = await bootstrap();
+        const cn = instance.create('cardNumber');
+        // 未销毁时重复同类型仍冲突。
+        expect(() => instance.create('cardNumber')).toThrowError(
+            expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
+        );
+        cn.destroy();
+        expect(() => instance.create('cardNumber')).not.toThrow();
+    });
+
+    it("address 同 mode destroy 后可再 create；不同 mode 始终并存", async () => {
+        const { instance } = await bootstrap();
+        const billing = instance.create('address', { mode: 'billing' });
+        // 不同 mode 并存不冲突。
+        expect(() => instance.create('address', { mode: 'shipping' })).not.toThrow();
+        // 同 mode 未销毁仍冲突。
+        expect(() => instance.create('address', { mode: 'billing' })).toThrowError(
+            expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
+        );
+        billing.destroy();
+        expect(() => instance.create('address', { mode: 'billing' })).not.toThrow();
+    });
+
+    it("unmount 不释放名额（仍占位，语义不变）", async () => {
+        const { instance } = await bootstrap();
+        const el = instance.create('expressCheckout');
+        await el.unmount();
+        // unmount 保留句柄可 remount，仍占互斥名额。
+        expect(() => instance.create('expressCheckout')).toThrowError(
+            expect.objectContaining({ code: ErrorCode.ELEMENT_CONFLICT })
+        );
+    });
+
+    it("instance.destroy 多 element 时不报错，之后 create 抛 INSTANCE_DESTROYED", async () => {
+        const { instance } = await bootstrap();
+        instance.create('expressCheckout');
+        instance.create('cardNumber');
+        instance.create('address', { mode: 'billing' });
+        expect(() => instance.destroy()).not.toThrow();
+        expect(() => instance.create('card')).toThrowError(
+            expect.objectContaining({ code: ErrorCode.INSTANCE_DESTROYED })
+        );
+    });
+});
+
 describe('CheckoutInstance colorScheme 透传', () => {
     it("以 appearance.colorScheme='dark' 创建实例并 mount element → iframe src 含 colorScheme=dark", async () => {
         const { instance } = await bootstrap(undefined, {

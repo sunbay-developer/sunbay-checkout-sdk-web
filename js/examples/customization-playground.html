@@ -656,9 +656,11 @@
                     var options = readExpressOptions();
                     show('重建 express（新钱包按钮配置）…', options);
                     try {
-                        if (expressElement && typeof expressElement.unmount === 'function') {
-                            // unmount 是异步的（卸载 iframe 并解绑），须 await 后再重建。
-                            await expressElement.unmount();
+                        if (expressElement && typeof expressElement.destroy === 'function') {
+                            // 切换 buttonType/buttonHeight 走 iframe URL，须重建 express。
+                            // 用 destroy（而非 unmount）释放实例互斥注册名额，否则重建抛
+                            // ELEMENT_CONFLICT（expressCheckout 单例）。destroy 同步销毁句柄。
+                            expressElement.destroy();
                         }
                         $('express').innerHTML = '';
                         expressElement = checkout.create('expressCheckout', options);
