@@ -57,6 +57,14 @@ checkout-sdk-web/
   **never carry card data** (plaintext or ciphertext). Card data is encrypted
   locally with an RSA public key only inside the hosted-runtime page and sent
   directly to the backend.
+- **English-only code (强制)**: all code in this repo — identifiers, **comments,
+  JSDoc, test `describe`/`it` descriptions, and in-code strings** — **must be in
+  English**. This SDK is an outward-facing published package; Chinese is not
+  allowed in `protocol/` and `js/` sources/tests/config. Exceptions: Markdown
+  docs (`docs/`, `*.md`, specs) and the `examples/` directory (demo, slated for
+  removal) are not bound by this rule. When editing or adding code, write English
+  comments/JSDoc; do not introduce Chinese. Quick residual check:
+  `grep -rl $'[\u4e00-\u9fff]' protocol/src js/src js/test` should return nothing.
 
 ### Historical note (deprecated)
 Early on, `protocol/scripts/sync-protocol.mjs` copied the protocol source into
