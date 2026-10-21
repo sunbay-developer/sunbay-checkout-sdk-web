@@ -463,15 +463,14 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **assertions** after unmount `#slot-card` empty and `getStatus()==='created'`; after remount `getStatus()==='ready'` with an iframe in the slot
 - **cleanup** `destroy()`
 
-### C7-09 locale runtime switch via updateCheckout (command accepted)
+### C7-09 locale runtime switch via updateCheckout (en→zh hot-switch)
 - **category** C7 · **priority** P2 · **real-device-condition** `none`
 - **harness-config** `{ session:'auto', locale:'en', elements:[{type:'card',slot:'#slot-card'}] }`
-- **steps** 1. `setup(...)` 2. `updateCheckout({ locale:'zh' })`
-- **expected** `updateCheckout({ locale })` is accepted (promise resolves, no `error` event)
-- **assertions** the call resolves; no `error` in `events`
+- **steps** 1. `setup(...)` 2. assert the card iframe shows the English title 3. `updateCheckout({ locale:'zh' })` 4. assert the in-iframe text switched to Chinese
+- **expected** `updateCheckout({ locale })` is accepted (promise resolves, no `error` event) AND the hosted runtime hot-switches the mounted element iframe's language at runtime (no reload): a known in-frame label changes English→Chinese
+- **assertions** the call resolves; no `error` in `events`; before the switch `slotFrame('#slot-card')` shows `"Card information"`; after the switch it shows `"银行卡信息"` and `"Card information"` has count 0
 - **cleanup** `destroy()`
-- **note** **Verified state**: the hosted runtime does not yet implement runtime locale hot-switch (`handleUpdateCheckout` ignores `payload.locale`). This is a product-confirmed required feature, handed off to a dedicated session — see `checkout/docs/handoff-locale-hot-switch.md`. Once implemented, strengthen to: after the switch, a known label inside the frame changes English→Chinese.
-- **cleanup** `destroy()`
+- **note** **Verified state**: implemented. The hosted runtime's `handleUpdateCheckout` broadcasts a `localeChange` signal over each online element port; the iframe's `useLocaleSignal` loads the target locale bundle and re-drives next-intl via `SdkLocaleProvider` (see `checkout/docs/handoff-locale-hot-switch.md`). Initial locale still flows via cookie/SSR; the signal and initial paths converge on the same i18n state. Locale signals carry no card data (PCI invariant preserved).
 
 ### C7-10 multiple instances isolation
 - **category** C7 · **priority** P2 · **real-device-condition** `none`

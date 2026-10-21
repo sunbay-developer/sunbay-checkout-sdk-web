@@ -21,7 +21,7 @@ export interface ElementSpec {
 export interface HarnessConfig {
     session: 'auto' | string;
     instanceKey?: string;
-    env?: 'dev' | 'prod';
+    env?: 'dev' | 'test' | 'prod';
     hostOrigin?: string;
     locale?: string;
     appearance?: Record<string, unknown>;

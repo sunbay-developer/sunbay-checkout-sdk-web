@@ -45,7 +45,7 @@ export type TransportFactory = (args: {
 export interface CreateCheckoutOptions {
     /** Checkout session id created by the backend (required). */
     sessionId: string;
-    /** Runtime environment (dev/prod), defaults to dev. */
+    /** Runtime environment (dev/test/prod), defaults to prod. */
     env?: Env;
     /** Override the hosted origin (takes precedence over env). */
     hostOrigin?: string;

@@ -100,7 +100,7 @@ The returned Promise **rejects** when:
 ```ts
 interface CreateCheckoutOptions {
     sessionId: string; // required — server-created session id
-    env?: Env; // 'dev' | 'prod', default 'dev'
+    env?: Env; // 'dev' | 'test' | 'prod', default 'prod'
     hostOrigin?: string; // override the hosted origin (takes precedence over env)
     locale?: string; // e.g. 'en', 'zh'
     appearance?: Appearance; // initial theming (see Appearance types)
@@ -111,7 +111,7 @@ interface CreateCheckoutOptions {
 | Field            | Type                 | Required | Notes                                                                 |
 | ---------------- | -------------------- | -------- | --------------------------------------------------------------------- |
 | `sessionId`      | `string`             | yes      | Created by your backend; cannot be replaced for the instance's life.  |
-| `env`            | `Env`                | no       | Selects a built-in hosted origin. Defaults to `'dev'`.                |
+| `env`            | `Env`                | no       | Selects a built-in hosted origin. Defaults to `'prod'`.               |
 | `hostOrigin`     | `string`             | no       | Explicit origin (no trailing slash); overrides `env`. For local dev/tests. |
 | `locale`         | `string`             | no       | Falls back to the session's language, then `en`.                      |
 | `appearance`     | `Appearance`         | no       | Serialized into each Element iframe `src` for a flash-free first frame. |
@@ -721,13 +721,14 @@ ErrorCode.VALIDATION_ERROR; // 'VALIDATION_ERROR'
 ### `Env` and hosted origins
 
 ```ts
-type Env = 'dev' | 'prod';
+type Env = 'dev' | 'test' | 'prod';
 ```
 
 | `env`   | Hosted origin                      |
 | ------- | ---------------------------------- |
-| `dev` (default) | `https://checkout.sunbay-dev.com` |
-| `prod`  | `https://checkout.sunbay.us`       |
+| `dev`   | `https://checkout.sunbay-dev.com`  |
+| `test`  | `https://checkout.sunbay-uat.us`   |
+| `prod` (default) | `https://checkout.sunbay.us`      |
 
 Pass `hostOrigin` to override (e.g. `http://localhost:3000` for local
 integration); it takes precedence over `env`.

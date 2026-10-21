@@ -93,7 +93,7 @@ interface HarnessConfig {
     // Optional named instance key for multi-instance cases (default '__default__').
     instanceKey?: string;
 
-    env?: 'dev' | 'prod';
+    env?: 'dev' | 'test' | 'prod';
     hostOrigin?: string;             // override hosted origin (e.g. stub/blackhole)
     locale?: string;
     appearance?: Appearance;         // colorScheme / variables / rules (instance-level initial)
