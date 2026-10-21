@@ -120,15 +120,12 @@ export class CheckoutInstance {
     private readonly appearance: Appearance | undefined;
 
     /** 已创建的 Element（按 elementId 索引）。 */
+    /**
+     * 互斥注册表的**单一数据源**：elementId → 已创建的 CheckoutElement。
+     * 互斥判定由本 Map 实时推导（见 {@link assertNoConflict}），元素 `destroy()` 经
+     * {@link releaseElement} 从本 Map 移除以释放名额（允许销毁后重建同类互斥 Element）。
+     */
     private readonly elements = new Map<string, CheckoutElement>();
-    /** 互斥注册：是否已存在聚合 card。 */
-    private hasCardElement = false;
-    /** 互斥注册：是否已存在任一拆分卡字段。 */
-    private hasCardFieldElement = false;
-    /** 互斥注册：已占用的地址 mode。 */
-    private readonly addressModes = new Set<string>();
-    /** 互斥注册：是否已存在 expressCheckout。 */
-    private hasExpressElement = false;
 
     /** 当前未决 confirm（同一时刻至多一个）。 */
     private pendingConfirm: PendingConfirm | null = null;
@@ -179,10 +176,10 @@ export class CheckoutInstance {
             initialOptions: options,
             colorScheme: this.appearance?.colorScheme,
             appearance: this.appearance,
+            onDestroy: (id: string) => this.releaseElement(id),
         };
         const element = CheckoutElement.create(elementOpts);
         this.elements.set(elementId, element);
-        this.registerElement(type, options);
         return element;
     }
 
@@ -333,13 +330,17 @@ export class CheckoutInstance {
         }
     }
 
-    /** 互斥检查：冲突时抛 ELEMENT_CONFLICT（不改变注册表）。 */
+    /** 互斥检查：冲突时抛 ELEMENT_CONFLICT（由 elements Map 实时推导，不改变注册表）。 */
     private assertNoConflict(type: ElementType, options?: ElementOptions): void {
+        const existing = [...this.elements.values()];
+        const has = (t: ElementType): boolean => existing.some((e) => e.type === t);
+        const hasCardField = (): boolean => existing.some((e) => CARD_FIELD_TYPES.includes(e.type));
+
         if (type === 'card') {
-            if (this.hasCardElement) {
+            if (has('card')) {
                 throw makeError(ErrorCode.ELEMENT_CONFLICT, 'A combined card Element already exists');
             }
-            if (this.hasCardFieldElement) {
+            if (hasCardField()) {
                 throw makeError(
                     ErrorCode.ELEMENT_CONFLICT,
                     'Combined card and split card fields are mutually exclusive; split card fields already exist'
@@ -348,26 +349,24 @@ export class CheckoutInstance {
             return;
         }
         if (CARD_FIELD_TYPES.includes(type)) {
-            if (this.hasCardElement) {
+            if (has('card')) {
                 throw makeError(
                     ErrorCode.ELEMENT_CONFLICT,
                     'Split card fields and combined card are mutually exclusive; a combined card already exists'
                 );
             }
             // 同一拆分字段类型不可重复。
-            for (const existing of this.elements.values()) {
-                if (existing.type === type) {
-                    throw makeError(
-                        ErrorCode.ELEMENT_CONFLICT,
-                        `A split card field of type ${type} already exists`
-                    );
-                }
+            if (has(type)) {
+                throw makeError(
+                    ErrorCode.ELEMENT_CONFLICT,
+                    `A split card field of type ${type} already exists`
+                );
             }
             return;
         }
         if (type === 'address') {
             const mode = (options as { mode?: string } | undefined)?.mode;
-            if (mode && this.addressModes.has(mode)) {
+            if (mode && existing.some((e) => e.type === 'address' && e.mode === mode)) {
                 throw makeError(
                     ErrorCode.ELEMENT_CONFLICT,
                     `An address Element with mode=${mode} already exists`
@@ -376,27 +375,23 @@ export class CheckoutInstance {
             return;
         }
         if (type === 'expressCheckout') {
-            if (this.hasExpressElement) {
+            if (has('expressCheckout')) {
                 throw makeError(ErrorCode.ELEMENT_CONFLICT, 'An expressCheckout Element already exists');
             }
             return;
         }
     }
 
-    /** 创建成功后登记互斥注册表。 */
-    private registerElement(type: ElementType, options?: ElementOptions): void {
-        if (type === 'card') {
-            this.hasCardElement = true;
-        } else if (CARD_FIELD_TYPES.includes(type)) {
-            this.hasCardFieldElement = true;
-        } else if (type === 'address') {
-            const mode = (options as { mode?: string } | undefined)?.mode;
-            if (mode) {
-                this.addressModes.add(mode);
-            }
-        } else if (type === 'expressCheckout') {
-            this.hasExpressElement = true;
+    /**
+     * 元素 `destroy()` 回调：从互斥注册表（elements Map）移除该 elementId，释放名额。
+     * 幂等；实例整体 destroy 时（已置 destroyed）走统一 `elements.clear()` 路径，此处 no-op，
+     * 避免遍历 elements 调 element.destroy() 时的并发修改。
+     */
+    private releaseElement(elementId: string): void {
+        if (this.destroyed) {
+            return;
         }
+        this.elements.delete(elementId);
     }
 
     /** 处理 paymentResult 事件：按 operationId 兑现未决 confirm；迟到/不匹配忽略。 */
