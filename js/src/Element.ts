@@ -267,6 +267,11 @@ export class CheckoutElement {
         iframe.style.border = '0';
         iframe.style.width = '100%';
         iframe.style.display = 'block';
+        // Height is fully driven by the iframe auto-resize protocol (child reports a ceil()'d
+        // height via postMessage; see installResizeListener). Disable the iframe's own scrollbar
+        // so sub-pixel content height differences on high-DPR browsers never surface a spurious
+        // scrollbar (observed on the express button at devicePixelRatio=2).
+        iframe.setAttribute('scrolling', 'no');
         container.appendChild(iframe);
         this.iframe = iframe;
         this.installResizeListener();

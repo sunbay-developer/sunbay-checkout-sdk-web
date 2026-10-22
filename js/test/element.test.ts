@@ -140,6 +140,24 @@ describe('CheckoutElement.mount', () => {
         await expect(mounted).resolves.toBeUndefined();
     });
 
+    it('iframe disables its own scrollbar (scrolling="no") so sub-pixel content never overflows', () => {
+        // Regression: on high-DPR (e.g. dpr=2) real browsers, the hosted child reports a
+        // ceil()'d content-box height while the actual scrollHeight can be ~1px larger due to
+        // sub-pixel rounding, so the default scrolling="auto" iframe shows a spurious scrollbar
+        // (notably on the express button). Height is fully driven by the resize protocol, so the
+        // iframe must never scroll itself.
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_scroll');
+        const container = makeContainer('t-scroll');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        expect(iframe.getAttribute('scrolling')).toBe('no');
+        // Layout invariants that make the auto-resize contract work (width 100%, no border, block).
+        expect(iframe.style.border).toBe('0px');
+        expect(iframe.style.width).toBe('100%');
+        expect(iframe.style.display).toBe('block');
+    });
+
     it('card/address/express use the /sdk/element/<type> path', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
