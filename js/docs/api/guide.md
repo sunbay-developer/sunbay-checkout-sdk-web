@@ -75,18 +75,6 @@ The package ships ESM (`import`), CommonJS (`require`), and TypeScript type
 declarations. It has no runtime dependencies other than the shared protocol
 contract package.
 
-### Script tag (IIFE build)
-
-Loading the IIFE build via a `<script>` tag exposes a `window.SunbayCheckout`
-global:
-
-```html
-<script src="https://.../@sunbay/checkout-sdk-js/dist/index.global.js"></script>
-<script>
-  const { createCheckout } = window.SunbayCheckout;
-</script>
-```
-
 ### Requirements
 
 - A modern browser with `postMessage`, `MessageChannel`, and `ResizeObserver`.

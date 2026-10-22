@@ -18,8 +18,6 @@ This repository is a pnpm workspace with three packages:
 npm install @sunbay/checkout-sdk-js
 ```
 
-Or load the IIFE build via a `<script>` tag, which exposes `window.SunbayCheckout`.
-
 ## Quick start
 
 A checkout session is created **server-side** by your backend (it holds the
