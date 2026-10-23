@@ -98,7 +98,7 @@ publish_pkg js "@sunbay/checkout-sdk-js"
 
 echo ""
 if [[ "$DRY_RUN" == true ]]; then
-    echo "✓ dry-run 完成（未实发）。两包 package.json 已升到 $VERSION，请按需 git 还原或提交。"
+    echo "✓ dry-run 完成（未实发）。两包 package.json 已升到 ${VERSION}，请按需 git 还原或提交。"
 else
     echo "✓ 发布完成: protocol@$VERSION + js@$VERSION"
     echo "  后续: 1) git 提交两包 package.json 版本改动并 push"

@@ -1,67 +1,63 @@
 # Sunbay Checkout Web SDK
 
-Browser SDK for embedding Sunbay Checkout into merchant web pages. It renders
-payment UI (card fields, Apple Pay / Google Pay express buttons) inside secure,
-Sunbay-hosted iframes, so **card data never touches the merchant page**.
+The Sunbay Checkout Web SDK lets merchants embed Sunbay's payment experience
+directly into their own web pages. Payment UI — card fields and Apple Pay /
+Google Pay express buttons — is rendered inside secure, **Sunbay-hosted
+iframes**, so sensitive card data is entered, encrypted, and transmitted within
+Sunbay's domain and **never touches the merchant page**. This keeps the merchant
+integration out of PCI card-data scope while still letting merchants control
+layout, theming, and the checkout flow.
 
-This repository is a pnpm workspace with three packages:
+This repository is a **pnpm workspace** (the workspace root is the repository
+root) containing the browser-facing packages of the SDK.
 
-| Package | Name | Description |
+## Packages
+
+| Package | Name | Role |
 | --- | --- | --- |
-| `protocol/` | `@sunbay/checkout-sdk-protocol` | Shared SDK ↔ hosted-runtime protocol contract (single source of truth). |
-| `js/` | `@sunbay/checkout-sdk-js` | Browser JS SDK — the `createCheckout` entry point merchants use. |
-| `react/` | `@sunbay/checkout-sdk-react` | React bindings (planned, placeholder). |
+| [`protocol/`](./protocol) | [`@sunbay/checkout-sdk-protocol`](https://www.npmjs.com/package/@sunbay/checkout-sdk-protocol) | The shared SDK ↔ hosted-runtime protocol contract — the single source of truth. Types and constants only. |
+| [`js/`](./js) | [`@sunbay/checkout-sdk-js`](https://www.npmjs.com/package/@sunbay/checkout-sdk-js) | The browser JS SDK. `createCheckout` is the entry point merchants integrate against. |
+| `react/` | `@sunbay/checkout-sdk-react` | React bindings. Planned — placeholder, not yet published. |
 
-## Install
+Native SDKs (React Native / iOS / Android) are planned and live in their own
+separate repositories.
+
+## How it fits together
+
+```
+Merchant page
+  └── @sunbay/checkout-sdk-js        ← merchants integrate here
+        │  speaks the protocol
+        ▼
+  @sunbay/checkout-sdk-protocol      ← shared contract (single source of truth)
+        ▲
+        │  the hosted runtime implements the same contract
+  Sunbay-hosted iframe runtime       ← renders card fields / wallet buttons
+```
+
+- The **protocol** package defines the message envelope, commands, events, error
+  codes, and public data shapes. Both the SDK and the Sunbay-hosted runtime
+  depend on it; it depends on nothing (one-way dependency, zero reverse deps).
+- The **js** package wraps that contract in an ergonomic, merchant-facing API
+  (`createCheckout`, Elements, events, `confirm()`).
+- Compatibility between the SDK and the hosted runtime is enforced at runtime by
+  the **protocol major version**, independent of the npm package version.
+
+## Getting started
+
+Merchant integration lives in the JS SDK — see
+**[`js/README.md`](./js/README.md)** for installation and a full quick start.
 
 ```bash
 npm install @sunbay/checkout-sdk-js
 ```
 
-## Quick start
+## Versioning
 
-A checkout session is created **server-side** by your backend (it holds the
-merchant API key). The browser only receives a `sessionId`.
-
-```ts
-import { createCheckout } from '@sunbay/checkout-sdk-js';
-
-// 1. Create the checkout instance from a server-created session.
-const checkout = await createCheckout({
-    sessionId, // from your backend
-    env: 'prod',
-});
-
-// 2. Mount Elements into your DOM.
-await checkout.create('cardNumber').mount('#card-number');
-await checkout.create('cardExpiry').mount('#card-expiry');
-await checkout.create('cardCvc').mount('#card-cvc');
-
-// Express wallets (Apple Pay / Google Pay) render their own buttons.
-const express = checkout.create('expressCheckout');
-express.on('expressAvailabilityChange', (evt) => {
-    console.log('available wallets:', evt.availableWallets);
-});
-await express.mount('#express');
-
-// 3. Confirm a card payment; the result arrives as a PaymentOutcome.
-checkout.on('paymentResult', (evt) => console.log(evt));
-const outcome = await checkout.confirm();
-```
-
-## Real-device testing
-
-A real-device (Playwright) end-to-end test suite lives in
-[`test-e2e/`](./test-e2e/README.md). It drives the published SDK build inside a
-standalone merchant-page harness against the hosted runtime, covering embedding
-modes, element combinations, theming/element customization, the payment flow,
-and the PCI card-isolation invariant. See
-[`test-e2e/RUNNING.md`](./test-e2e/RUNNING.md) for how to run it.
-
-## Documentation
-
-Full API reference and integration guides will be published on a dedicated
-documentation site. A link will be added here once available.
+The `protocol` and `js` packages are published **in lockstep**: they always
+share the same version number, so a given `@sunbay/checkout-sdk-js` always pairs
+with the matching `@sunbay/checkout-sdk-protocol`. Releases are cut with
+[`scripts/release.sh`](./scripts/release.sh).
 
 ## Development
 
@@ -72,6 +68,11 @@ pnpm --filter @sunbay/checkout-sdk-js run type-check
 pnpm --filter @sunbay/checkout-sdk-js run test
 ```
 
-The protocol package is the single source of truth for the SDK ↔ hosted-runtime
-contract. Compatibility is enforced at runtime by the protocol major version,
-not by the npm version.
+## Real-device testing
+
+A real-device (Playwright) end-to-end suite lives in
+[`test-e2e/`](./test-e2e/README.md). It drives the published SDK build inside a
+standalone merchant-page harness against the hosted runtime, covering embedding
+modes, element combinations, theming/element customization, the payment flow,
+and the PCI card-isolation invariant. See
+[`test-e2e/RUNNING.md`](./test-e2e/RUNNING.md) for how to run it.
