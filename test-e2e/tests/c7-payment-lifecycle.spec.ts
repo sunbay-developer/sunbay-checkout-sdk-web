@@ -183,21 +183,25 @@ test('C7-08 element unmount / remount @p2 @c7', async ({ page }) => {
 });
 
 test('C7-09 locale runtime switch via updateCheckout @p2 @c7', async ({ page }) => {
-    const r = await setup(page, { session: 'auto', locale: 'en', elements: [{ type: 'card', slot: '#slot-card' }] });
+    const r = await setup(page, {
+        session: 'auto',
+        locale: 'en-US',
+        elements: [{ type: 'card', slot: '#slot-card' }],
+    });
     expect(r.ok, r.error?.message).toBe(true);
 
-    // Initial locale is en: the card iframe renders the English card-information title.
+    // Initial locale is en-US: the card iframe renders the English card-information title.
     const frame = slotFrame(page, '#slot-card');
     await expect(frame.getByText('Card information')).toBeVisible({ timeout: 15_000 });
 
     // updateCheckout({ locale }) must be accepted (promise resolves, no error).
-    await callHarness(page, 'updateCheckout', { locale: 'zh' });
+    await callHarness(page, 'updateCheckout', { locale: 'zh-CN' });
     const errs = (await getEvents(page)).filter((e) => e.name === 'error');
     expect(errs.length).toBe(0);
 
     // Runtime hot-switch: the hosted runtime broadcasts a localeChange signal to the
-    // mounted element iframe, which loads the zh bundle and re-drives next-intl. The
-    // in-iframe text must switch en->zh WITHOUT a reload.
+    // mounted element iframe, which loads the zh-CN bundle and re-drives next-intl. The
+    // in-iframe text must switch en-US->zh-CN WITHOUT a reload.
     await expect(frame.getByText('银行卡信息')).toBeVisible({ timeout: 15_000 });
     await expect(frame.getByText('Card information')).toHaveCount(0);
 });
