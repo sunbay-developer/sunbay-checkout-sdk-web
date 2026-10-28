@@ -1,9 +1,10 @@
 # @sunbay/checkout-sdk-js
 
 Browser JS SDK for embedding **Sunbay Checkout** into merchant web pages. It
-renders payment UI — card fields and Apple Pay / Google Pay express buttons —
-inside secure, Sunbay-hosted iframes, so **card data never touches the merchant
-page**.
+renders the payment UI inside secure, Sunbay-hosted iframes, so merchants can
+accept a growing range of payment methods while sensitive payment details never
+touch the merchant page. This keeps your integration PCI-compliant and your
+customers' data protected out of the box.
 
 `createCheckout` is the single entry point: you create a checkout session
 server-side, hand the resulting `sessionId` to the browser, mount Elements into
@@ -29,7 +30,6 @@ import { createCheckout } from '@sunbay/checkout-sdk-js';
 // 1. Create the checkout instance from a server-created session.
 const checkout = await createCheckout({
     sessionId, // from your backend
-    env: 'prod',
 });
 
 // 2. Mount Elements into your DOM.
