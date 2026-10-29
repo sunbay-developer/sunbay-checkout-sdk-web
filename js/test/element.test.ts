@@ -158,6 +158,35 @@ describe('CheckoutElement.mount', () => {
         expect(iframe.style.display).toBe('block');
     });
 
+    it('iframe grants payment + publickey-credentials-get permissions scoped to hostOrigin (so cross-origin wallets/WebAuthn work, e.g. Safari 17+ Apple Pay)', () => {
+        // Regression: without an allow attribute the browser's Permissions Policy denies the
+        // Payment Request API inside the cross-origin element iframe ("payment is not allowed in
+        // this document"), so Apple Pay / Google Pay cannot be invoked. All element iframes carry
+        // the same allowlist, each feature scoped to 'self' and the hostOrigin (not opened to any
+        // other origin), mirroring the mature Stripe setup.
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_allow');
+        const container = makeContainer('t-allow');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const allow = iframe.getAttribute('allow') ?? '';
+        expect(allow).toContain(`payment 'self' ${HOST_ORIGIN}`);
+        expect(allow).toContain(`publickey-credentials-get 'self' ${HOST_ORIGIN}`);
+    });
+
+    it('all element types (not only expressCheckout) carry the payment allow attribute', () => {
+        // The merchant decided every element iframe should be granted the same permissions, so the
+        // SDK works uniformly regardless of which element invokes a wallet/WebAuthn flow.
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_allow_card');
+        const container = makeContainer('t-allow-card');
+        void el.mount(container);
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+        const allow = iframe.getAttribute('allow') ?? '';
+        expect(allow).toContain(`payment 'self' ${HOST_ORIGIN}`);
+        expect(allow).toContain(`publickey-credentials-get 'self' ${HOST_ORIGIN}`);
+    });
+
     it('card/address/express use the /sdk/element/<type> path', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');

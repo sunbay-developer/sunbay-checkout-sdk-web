@@ -264,6 +264,20 @@ export class CheckoutElement {
         iframe.src = this.resolveSrc();
         iframe.title = `sunbay-checkout-${this.type}`;
         iframe.setAttribute('data-element-id', this.elementId);
+        // Grant the Permissions Policy features the hosted iframe needs for cross-origin payment
+        // flows, each scoped to 'self' and the hostOrigin (not opened to any other origin):
+        // - `payment`: the Payment Request API used by Apple Pay / Google Pay. Without it the
+        //   browser denies the API inside this cross-origin iframe ("payment is not allowed in
+        //   this document"); Safari 17+ specifically requires allow="payment" for cross-origin
+        //   Apple Pay.
+        // - `publickey-credentials-get`: WebAuthn get(), used by passkey / biometric payment
+        //   verification (e.g. 3DS/SCA). Cross-origin iframes need it explicitly granted.
+        // All element types carry the same allowlist so the SDK works uniformly regardless of
+        // which element drives a wallet / WebAuthn flow.
+        iframe.setAttribute(
+            'allow',
+            `payment 'self' ${this.hostOrigin}; publickey-credentials-get 'self' ${this.hostOrigin}`
+        );
         iframe.style.border = '0';
         iframe.style.width = '100%';
         iframe.style.display = 'block';
