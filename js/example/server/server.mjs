@@ -31,6 +31,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, extname } from 'node:path';
 
+// Session creation (the "token" source) lives in its own standalone module so
+// it can also be imported or run directly (node server/session.mjs). It loads
+// example/.env.local itself, so no duplicate credential loading is needed here.
+import { createSession, HAS_CREDENTIALS } from './session.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Paths relative to this file. server/ lives under js/example/. */
 const EXAMPLE_ROOT = join(__dirname, '..');
@@ -38,26 +43,10 @@ const PUBLIC_DIR = join(EXAMPLE_ROOT, 'public');
 /** js/dist (the SDK IIFE build the pages load). example/ → js/example, so ../../dist. */
 const SDK_DIST = join(EXAMPLE_ROOT, '..', 'dist');
 
-// Load sandbox credentials from example/.env.local (git-ignored). A missing file
-// is tolerated: the server still serves static files + healthz.
-try {
-    process.loadEnvFile(join(EXAMPLE_ROOT, '.env.local'));
-} catch {
-    // No .env.local: credential-free mode (UI still inspectable).
-}
-
 const CONFIG = {
     port: Number(process.env.PORT ?? 8095),
-    openApiUrl: process.env.OPEN_API_URL ?? 'https://open.sunbay-dev.com',
-    apiKey: process.env.API_KEY,
-    appId: process.env.APP_ID,
-    merchantId: process.env.MERCHANT_ID,
-    currency: process.env.CURRENCY ?? 'USD',
     hostedOrigin: process.env.HOSTED_ORIGIN ?? 'http://localhost:3000',
 };
-
-/** True when all required sandbox credentials are present. */
-const HAS_CREDENTIALS = Boolean(CONFIG.apiKey && CONFIG.appId && CONFIG.merchantId);
 
 /** Static file extension → Content-Type. */
 const MIME = {
@@ -87,69 +76,6 @@ function sendJson(res, status, obj) {
         'Content-Length': Buffer.byteLength(body),
     });
     res.end(body);
-}
-
-/**
- * Create a checkout session via the open platform, using the sandbox merchant
- * key held on the server. Mirrors test-e2e/server/server.mjs.
- *
- * @param {{ items?: {name:string,amount:number,num:number}[], description?: string,
- *           returnUrl?: string, currency?: string, collectBillingAddress?: boolean,
- *           collectShippingAddress?: boolean }} input
- * @returns {Promise<object>} open-platform response data (includes sessionId)
- */
-async function createSession(input) {
-    const items =
-        Array.isArray(input.items) && input.items.length > 0
-            ? input.items
-            : [{ name: 'SDK Example Item', amount: 1999, num: 1 }];
-
-    const currency = input.currency ?? CONFIG.currency;
-    const orderAmount = items.reduce((sum, i) => sum + Number(i.amount) * Number(i.num), 0);
-    const taxAmount = Math.round(orderAmount * 0.08);
-    const now = Date.now();
-    const requestId = `EX${now}`;
-    const orderId = `EX${now}`;
-
-    const payload = {
-        appId: CONFIG.appId,
-        transactionRequestId: requestId,
-        referenceOrderId: orderId,
-        merchantId: CONFIG.merchantId,
-        amount: {
-            orderAmount,
-            taxAmount,
-            priceCurrency: currency,
-        },
-        description: input.description ?? 'SDK example order',
-        productList: items,
-        // Default: collect billing only; the split-field + address example may
-        // request collectShippingAddress:true.
-        collectBillingAddress: input.collectBillingAddress ?? true,
-        collectShippingAddress: input.collectShippingAddress ?? false,
-        merchantReturnUrl: input.returnUrl ?? '',
-        notifyUrl: input.returnUrl ?? '',
-    };
-
-    const res = await fetch(`${CONFIG.openApiUrl}/v1/checkout/create-session`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${CONFIG.apiKey}`,
-            'X-Client-Request-Id': requestId,
-            'X-Timestamp': String(now),
-        },
-        body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (data.code !== '0' || !data.data?.sessionId) {
-        const msg = data.msg || `upstream create-session failed (code=${data.code})`;
-        const err = new Error(msg);
-        err.detail = data;
-        throw err;
-    }
-    return data.data;
 }
 
 /** Serve a static file from the allowed roots (public/ or js/dist), preventing path traversal. */

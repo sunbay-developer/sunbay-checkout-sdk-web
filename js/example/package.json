@@ -6,6 +6,7 @@
     "type": "module",
     "scripts": {
         "start": "node server/server.mjs",
-        "serve": "node server/server.mjs"
+        "serve": "node server/server.mjs",
+        "token": "node server/session.mjs"
     }
 }
