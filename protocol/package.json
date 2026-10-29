@@ -1,6 +1,6 @@
 {
     "name": "@sunbay/checkout-sdk-protocol",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "Shared protocol contract between the Sunbay Checkout SDK and the Sunbay-hosted runtime (single source of truth).",
     "type": "module",
     "main": "./dist/index.cjs",

@@ -1,6 +1,6 @@
 {
     "name": "@sunbay/checkout-sdk-js",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "Browser JS SDK for embedding Sunbay Checkout — the createCheckout entry point merchants use to render card fields and express wallet buttons in secure, Sunbay-hosted iframes.",
     "type": "module",
     "main": "./dist/index.cjs",
