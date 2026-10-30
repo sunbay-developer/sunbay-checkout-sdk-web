@@ -331,8 +331,6 @@ export class CheckoutElement {
 
         return new Promise<void>((resolve, reject) => {
             let settled = false;
-            // True once the createElement request resolved (the hosted side has registered the element).
-            let registered = false;
             let timer: ReturnType<typeof setTimeout> | null = null;
             const cleanup = (): void => {
                 settled = true;
@@ -372,9 +370,9 @@ export class CheckoutElement {
                 cleanup();
                 this.status = 'loadError';
                 this.removeIframe();
-                if (registered) {
-                    this.releaseHostedElement();
-                }
+                // Release even if the createElement response has not arrived yet: the hosted side may
+                // already have registered the element, and destroyElement is idempotent there.
+                this.releaseHostedElement();
                 const err = (payload as LoadErrorPayload)?.error;
                 reject(
                     err ??
@@ -426,9 +424,7 @@ export class CheckoutElement {
                     options: this.options,
                 })
                 .then(
-                    () => {
-                        registered = true;
-                    },
+                    () => undefined,
                     (cmdErr: unknown) => {
                         if (settled) {
                             return;

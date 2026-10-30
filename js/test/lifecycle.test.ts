@@ -392,6 +392,23 @@ describe('CheckoutElement.mount lifecycle', () => {
         expect(transport.requests.map((r) => r.name)).toEqual(['createElement', 'destroyElement']);
     });
 
+    it('runtime loadError before the createElement response still sends destroyElement', async () => {
+        const transport = createMockTransport();
+        // createElement never resolves within the test: the response is still in flight.
+        transport.requestImpl = (name) =>
+            name === 'createElement' ? new Promise(() => undefined) : Promise.resolve({});
+        const el = makeElement(transport);
+        const box = track(el.mount(makeContainer()));
+        await vi.advanceTimersByTimeAsync(0);
+        transport.emit('loadError', {
+            elementId: 'el_1',
+            error: { code: ErrorCode.RUNTIME_LOAD_FAILED, message: 'x' },
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(box.state).toBe('rejected');
+        expect(transport.requests.map((r) => r.name)).toEqual(['createElement', 'destroyElement']);
+    });
+
     it('mount honors a custom timeoutMs', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport);
