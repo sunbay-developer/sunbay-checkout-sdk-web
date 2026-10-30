@@ -29,7 +29,7 @@ const HOST_ORIGINS: Record<Env, string> = {
  */
 export function resolveHostOrigin(env: Env = 'prod', override?: string): string {
     if (override) {
-        return override;
+        return override.replace(/\/+$/, '');
     }
     return HOST_ORIGINS[env];
 }

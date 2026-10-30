@@ -56,7 +56,7 @@ The test infrastructure is self-contained in this `test-e2e/` directory.
 ```
 Test harness page            Test backend                 Sunbay platform + hosted runtime
   standard merchant-page        creates sessions with         create-session API / /embed/sdk/main
-  simulator                     the sandbox merchant key       /embed/embed/sdk/field/* /embed/embed/sdk/element/*
+  simulator                     the sandbox merchant key       /embed/sdk/field/* /embed/sdk/element/*
   standalone origin (:8090)     /api/create-session           (hosted runtime, default :3000)
         |                          |  (key stays server-side)            |
         | (1) POST /api/create-session                                   |

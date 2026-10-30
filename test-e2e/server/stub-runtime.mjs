@@ -2,8 +2,8 @@
 /**
  * Optional stub runtime — ONLY for case C1-03 (PROTOCOL_UNSUPPORTED).
  *
- * Serves a fake `/embed/sdk/main` page (also the legacy `/sdk/main` alias) that, once loaded, broadcasts a RuntimeHello whose
- * `supportedMajorVersions` deliberately EXCLUDES the SDK's current PROTOCOL_MAJOR (1).
+ * Serves a fake `/embed/sdk/main` page (also the legacy `/sdk/main` alias) that, once
+ * loaded, broadcasts a RuntimeHello whose `supportedMajorVersions` deliberately EXCLUDES the SDK's current PROTOCOL_MAJOR (1).
  * createCheckout then finds no common major version and rejects with PROTOCOL_UNSUPPORTED,
  * which is exactly what C1-03 verifies.
  *

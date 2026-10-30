@@ -50,7 +50,7 @@ example/
    ```
 
 2. **Run the hosted runtime** the SDK talks to (serves `/embed/sdk/main`,
-   `/embed/embed/sdk/field/*`, `/embed/embed/sdk/element/*`). Locally this is the `checkout` repo's dev
+   `/embed/sdk/field/*`, `/embed/sdk/element/*`). Locally this is the `checkout` repo's dev
    server on `:3000`:
 
    ```bash

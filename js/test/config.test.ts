@@ -26,6 +26,11 @@ describe('resolveHostOrigin', () => {
         expect(resolveHostOrigin('prod')).toBe(PROD);
     });
 
+    it('resolveHostOrigin strips trailing slash from override', () => {
+        expect(resolveHostOrigin('dev', 'http://localhost:3000/')).toBe('http://localhost:3000');
+        expect(resolveHostOrigin('dev', 'http://localhost:3000//')).toBe('http://localhost:3000');
+    });
+
     it('returns override first when override is non-empty', () => {
         expect(resolveHostOrigin('dev', 'http://localhost:3000')).toBe(
             'http://localhost:3000'

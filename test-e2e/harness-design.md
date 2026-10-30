@@ -18,7 +18,7 @@
 |---|---|---|
 | `harness.html` + `harness.mjs` | Harness page: loads the SDK IIFE build, exposes `window.__sunbayHarness`, provides mount slots | `http://localhost:8090` |
 | `server/server.mjs` | Test backend: holds the sandbox merchant key, `POST /api/create-session` returns a `sessionId` | same origin as the harness |
-| hosted runtime | Hosts `/embed/sdk/main`, `/embed/embed/sdk/field/*`, `/embed/embed/sdk/element/*` | `http://localhost:3000` or a real environment |
+| hosted runtime | Hosts `/embed/sdk/main`, `/embed/sdk/field/*`, `/embed/sdk/element/*` | `http://localhost:3000` or a real environment |
 | stub runtime (optional) | Fake hello endpoint (for PROTOCOL_UNSUPPORTED), started on demand | in `test-e2e/`, `:8099` |
 
 The harness provides a set of **empty containers with fixed ids** (mount slots)
