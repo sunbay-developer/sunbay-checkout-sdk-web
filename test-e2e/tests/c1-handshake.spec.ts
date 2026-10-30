@@ -84,12 +84,11 @@ test('C1-05 paymentMethods filter (subtract/sort only) @p2 @c1', async ({ page }
     // First, discover the methods this session actually offers (no filter).
     const base = await setup(page, { session: 'auto', elements: [] });
     expect(base.ok, base.error?.message).toBe(true);
-    const original: string[] = await page.evaluate(() =>
+    const original: string[] = await page.evaluate(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ((window as any).__sunbayHarness.instance.getSession().paymentMethods ?? []).map(
-            (m: { method: string }) => m.method
-        )
-    );
+        const session = await (window as any).__sunbayHarness.instance.getSession();
+        return (session.paymentMethods ?? []).map((m: { method: string }) => m.method);
+    });
     await callHarness(page, 'reset');
     test.skip(original.length < 1, 'session offers no payment methods to filter');
 
@@ -101,12 +100,11 @@ test('C1-05 paymentMethods filter (subtract/sort only) @p2 @c1', async ({ page }
         elements: [],
     });
     expect(result.ok, result.error?.message).toBe(true);
-    const methods: string[] = await page.evaluate(() =>
+    const methods: string[] = await page.evaluate(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ((window as any).__sunbayHarness.instance.getSession().paymentMethods ?? []).map(
-            (m: { method: string }) => m.method
-        )
-    );
+        const session = await (window as any).__sunbayHarness.instance.getSession();
+        return (session.paymentMethods ?? []).map((m: { method: string }) => m.method);
+    });
     // Subtract-only: hidden method is gone, and the result is a subset of the original.
     expect(methods).not.toContain(toHide);
     for (const m of methods) {

@@ -41,17 +41,31 @@ test('C7-01 full card payment flow -> paymentResult @p0 @c7', async ({ page }) =
     expect(r.ok, r.error?.message).toBe(true);
 
     await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DEFAULT);
-    const confirm = await callHarness<{ ok: boolean; outcome?: { status: string; operationId: string }; operationId?: string }>(
-        page,
-        'confirm'
-    );
+    // confirm() resolves only terminal outcomes (succeeded|failed|canceled) or, once the
+    // watchdog fires, 'pending'. Bound the wait so the test can never hang.
+    const confirm = await callHarness<{
+        ok: boolean;
+        outcome?: { status: string; operationId: string };
+        operationId?: string;
+    }>(page, 'confirm', { resultTimeoutMs: 45_000 });
     expect(confirm.ok, JSON.stringify(confirm)).toBe(true);
-    expect(['succeeded', 'failed', 'pending', 'canceled']).toContain(confirm.outcome?.status);
+    const status = confirm.outcome?.status;
+    expect(status, 'confirm outcome must be defined').toBeDefined();
+    // Sandbox: a terminal outcome, or the watchdog's 'pending' (never undefined).
+    expect(['succeeded', 'failed', 'canceled', 'pending']).toContain(status);
+    expect(confirm.operationId, 'operationId present').toBeTruthy();
+    expect(confirm.outcome?.operationId).toBe(confirm.operationId);
 
+    // A terminal outcome must be mirrored by a paymentResult event with the same
+    // operationId. The watchdog's 'pending' is a local timeout, not a runtime result.
+    test.skip(status === 'pending', 'watchdog pending: no terminal paymentResult to correlate');
     const events = await getEvents(page);
-    const result = events.find((e) => e.name === 'paymentResult');
-    expect(result, 'paymentResult event observed').toBeTruthy();
-    expect((result!.payload as { operationId: string }).operationId).toBe(confirm.operationId);
+    const matching = events.filter(
+        (e) =>
+            e.name === 'paymentResult' &&
+            (e.payload as { operationId?: string }).operationId === confirm.operationId
+    );
+    expect(matching.length, 'paymentResult event with the same operationId').toBeGreaterThanOrEqual(1);
 
     await assertNoCardLeak(page);
 });

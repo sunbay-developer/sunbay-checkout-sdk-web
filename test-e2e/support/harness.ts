@@ -59,6 +59,7 @@ export async function openHarness(page: Page, hostedOrigin: string = HOSTED_ORIG
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).E2E_HOSTED_ORIGIN = origin;
     }, hostedOrigin);
+    trackParentRequests(page);
     await page.goto(HARNESS_URL);
     await page.waitForFunction(() => (window as unknown as { __sunbayHarnessReady?: boolean }).__sunbayHarnessReady === true, {
         timeout: 15_000,
@@ -136,20 +137,71 @@ export function slotFrame(page: Page, slot: string): FrameLocator {
     return page.frameLocator(`${slot} iframe`);
 }
 
+/** Outgoing request record captured from the PARENT (merchant) page. */
+interface CapturedRequest {
+    url: string;
+    postData: string;
+}
+
+const parentRequests = new WeakMap<Page, CapturedRequest[]>();
+
 /**
- * PCI invariant scan: assert that neither parentMessages nor events contain any
- * card number / CVV. Serializes both and searches for the forbidden substrings.
+ * Start recording outgoing requests issued by the PARENT page's main frame (merchant
+ * context). Hosted iframes legitimately send card ciphertext to the backend, so only
+ * requests whose frame is the top frame are recorded. Idempotent per page; call it
+ * before card entry (openHarness does).
+ */
+export function trackParentRequests(page: Page): void {
+    if (parentRequests.has(page)) return;
+    const list: CapturedRequest[] = [];
+    parentRequests.set(page, list);
+    page.on('request', (req) => {
+        let frameIsTop = false;
+        try {
+            frameIsTop = req.frame() === page.mainFrame();
+        } catch {
+            frameIsTop = false;
+        }
+        if (!frameIsTop) return;
+        list.push({ url: req.url(), postData: req.postData() ?? '' });
+    });
+}
+
+/**
+ * PCI invariant scan: assert that neither parentMessages, SDK events nor outgoing
+ * requests of the parent page contain the card number (or 8-digit chunks of it), the
+ * CVV value, or the expiry string.
  */
 export async function assertNoCardLeak(page: Page, card: SandboxCard = SANDBOX_CARD_DEFAULT): Promise<void> {
     const [events, messages] = await Promise.all([getEvents(page), getParentMessages(page)]);
-    const haystack = JSON.stringify({ events, messages });
-    expect(haystack, 'card number must never appear in parent messages/events').not.toContain(
-        card.cardNumber
-    );
-    // Also check contiguous 8+ digit substrings of the PAN to catch partial leaks.
-    for (let i = 0; i + 8 <= card.cardNumber.length; i++) {
-        const chunk = card.cardNumber.slice(i, i + 8);
-        expect(haystack, `PAN chunk ${chunk} must not leak`).not.toContain(chunk);
+    const requests = parentRequests.get(page) ?? [];
+    const sources: Record<string, string> = {
+        'parent messages/events': JSON.stringify({ events, messages }),
+        'parent page network requests': requests.map((r) => `${r.url}\n${r.postData}`).join('\n'),
+    };
+    const yy = card.expiryYear.slice(2);
+    const expiryStrings = [
+        `${card.expiryMonth}/${yy}`,
+        `${card.expiryMonth} / ${yy}`,
+        `${card.expiryMonth}/${card.expiryYear}`,
+        `${card.expiryMonth}${yy}`,
+    ];
+    for (const [label, haystack] of Object.entries(sources)) {
+        expect(haystack, `card number must never appear in ${label}`).not.toContain(card.cardNumber);
+        // Also check contiguous 8+ digit substrings of the PAN to catch partial leaks.
+        for (let i = 0; i + 8 <= card.cardNumber.length; i++) {
+            const chunk = card.cardNumber.slice(i, i + 8);
+            expect(haystack, `PAN chunk ${chunk} must not leak in ${label}`).not.toContain(chunk);
+        }
+        // CVV: match only as a quoted JSON string value to avoid false hits on
+        // ids/timestamps that merely contain the digits.
+        expect(haystack, `CVV must not appear in ${label}`).not.toContain(`"${card.cvv}"`);
+        expect(haystack, `CVV must not appear in ${label}`).not.toMatch(
+            new RegExp(`(cvv|cvc|securityCode)[\\\\"'\\s]*[:=][\\\\"'\\s]*${card.cvv}`, 'i')
+        );
+        for (const exp of expiryStrings.slice(0, 3)) {
+            expect(haystack, `expiry ${exp} must not appear in ${label}`).not.toContain(exp);
+        }
     }
 }
 
