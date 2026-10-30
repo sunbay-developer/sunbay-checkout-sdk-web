@@ -126,7 +126,7 @@ publish_pkg() {
             --registry "$REGISTRY" \
             --//registry.npmjs.org/:_authToken="$SUNBAY_NPM_TOKEN" \
             --access public ${tag_args[@]+"${tag_args[@]}"} >/dev/null
-        echo "    + 已发布 $name@$VERSION${TAG:+（dist-tag: $TAG）}"
+        echo "    + 已发布 $name@$VERSION${TAG:+（dist-tag: ${TAG}）}"
     fi
     rm -f "$tgz"
     popd >/dev/null
