@@ -149,7 +149,8 @@ challenges: it only emits the event. Your page must handle the action.
 - `checkout.updateCheckout({ locale?, appearance? })` hot-switches locale/appearance.
 - `getSession()`, `refresh()`, `getPaymentStatus()` read session/payment state.
 - `checkout.destroy()` is idempotent, removes all iframes, and later calls reject/throw
-  `INSTANCE_DESTROYED`.
+  `INSTANCE_DESTROYED`. Calling `destroy()` while a `confirm()` is pending rejects that
+  `confirm()` with `INSTANCE_DESTROYED`.
 
 ## Behavior changes in 0.0.6
 

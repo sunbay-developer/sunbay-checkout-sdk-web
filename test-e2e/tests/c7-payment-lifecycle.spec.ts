@@ -40,34 +40,54 @@ test('C7-01 full card payment flow -> paymentResult @p0 @c7', async ({ page }) =
     const r = await setup(page, { session: 'auto', elements: SPLIT });
     expect(r.ok, r.error?.message).toBe(true);
 
-    await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DEFAULT);
-    // confirm() resolves only terminal outcomes (succeeded|failed|canceled) or, once the
-    // watchdog fires, 'pending'. Bound the wait so the test can never hang.
-    const confirm = await callHarness<{
-        ok: boolean;
-        outcome?: { status: string; operationId: string };
-        operationId?: string;
-    }>(page, 'confirm', { resultTimeoutMs: 45_000 });
-    expect(confirm.ok, JSON.stringify(confirm)).toBe(true);
-    const status = confirm.outcome?.status;
-    expect(status, 'confirm outcome must be defined').toBeDefined();
-    // Sandbox: a terminal outcome, or the watchdog's 'pending' (never undefined).
-    expect(['succeeded', 'failed', 'canceled', 'pending']).toContain(status);
-    expect(confirm.operationId, 'operationId present').toBeTruthy();
-    expect(confirm.outcome?.operationId).toBe(confirm.operationId);
+    try {
+        await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DEFAULT);
+        // confirm() resolves terminal outcomes or, once the watchdog fires, 'pending'.
+        const confirm = await callHarness<{
+            ok: boolean;
+            outcome?: { status: string; operationId: string };
+            operationId?: string;
+        }>(page, 'confirm', { resultTimeoutMs: 45_000 });
+        expect(confirm.ok, JSON.stringify(confirm)).toBe(true);
+        expect(confirm.operationId, 'operationId present').toBeTruthy();
+        expect(confirm.outcome?.operationId).toBe(confirm.operationId);
 
-    // A terminal outcome must be mirrored by a paymentResult event with the same
-    // operationId. The watchdog's 'pending' is a local timeout, not a runtime result.
-    test.skip(status === 'pending', 'watchdog pending: no terminal paymentResult to correlate');
-    const events = await getEvents(page);
-    const matching = events.filter(
-        (e) =>
-            e.name === 'paymentResult' &&
-            (e.payload as { operationId?: string }).operationId === confirm.operationId
-    );
-    expect(matching.length, 'paymentResult event with the same operationId').toBeGreaterThanOrEqual(1);
+        const paymentResultFor = async (): Promise<{ status?: string } | undefined> => {
+            const hit = (await getEvents(page)).find(
+                (e) =>
+                    e.name === 'paymentResult' &&
+                    (e.payload as { operationId?: string }).operationId === confirm.operationId
+            );
+            return (hit?.payload as { outcome?: { status?: string } } | undefined)?.outcome;
+        };
 
-    await assertNoCardLeak(page);
+        let terminal = confirm.outcome?.status;
+        if (terminal === 'pending') {
+            // Watchdog fired. The sandbox must still reach a terminal state: wait (bounded)
+            // for a later terminal paymentResult with the same operationId; otherwise FAIL.
+            await expect
+                .poll(
+                    async () => {
+                        const s = (await paymentResultFor())?.status;
+                        return s !== undefined && s !== 'pending' ? s : undefined;
+                    },
+                    { timeout: 60_000, message: 'stuck payment: no terminal paymentResult after pending' }
+                )
+                .toBeDefined();
+            terminal = (await paymentResultFor())?.status;
+        }
+        expect(['succeeded', 'failed', 'canceled']).toContain(terminal);
+
+        const matching = (await getEvents(page)).filter(
+            (e) =>
+                e.name === 'paymentResult' &&
+                (e.payload as { operationId?: string }).operationId === confirm.operationId
+        );
+        expect(matching.length, 'paymentResult event with the same operationId').toBeGreaterThanOrEqual(1);
+    } finally {
+        // PCI scan always runs, whatever the payment outcome.
+        await assertNoCardLeak(page);
+    }
 });
 
 test('C7-02 card value never leaks (PCI) @p0 @c7', async ({ page }) => {

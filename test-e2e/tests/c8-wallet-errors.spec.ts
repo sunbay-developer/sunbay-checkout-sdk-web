@@ -12,7 +12,9 @@
  *   - validationFail : fires onvalidatemerchant with a bogus validationURL, so the
  *                      sandbox backend rejects merchant validation.
  *   - cancel         : fires oncancel (user dismissed the sheet).
- *   - authorize      : fires onpaymentauthorized with a fake token (the backend rejects it).
+ *   - authorizeFail : fires onpaymentauthorized with a fake token and makes
+ *                      completePayment() throw, so the failure truly originates in the
+ *                      authorization stage (applePayClient: stage 'authorization').
  *
  * How to run (needs sandbox credentials in test-e2e/.env.local and the hosted runtime
  * running, see ../RUNNING.md). The specs are skipped without credentials, or when the
@@ -25,7 +27,7 @@ import { openHarness, setup, callHarness, getEvents, getParentMessages, availabl
 import type { HarnessEvent } from '../support/harness';
 import { getHealth } from '../support/env';
 
-type Scenario = 'validationFail' | 'cancel' | 'authorize';
+type Scenario = 'validationFail' | 'cancel' | 'authorizeFail';
 
 /** Fake wallet token string; it must never be observable by the merchant page. */
 const STUB_TOKEN = 'STUB_APPLE_PAY_TOKEN_DO_NOT_LEAK_7f3a9c';
@@ -38,8 +40,6 @@ async function installApplePayStub(context: BrowserContext, scenario: Scenario, 
     await context.addInitScript(
         ({ scenarioName, tokenValue }) => {
             const w = window as unknown as Record<string, unknown>;
-            // Allow tests to override the scenario at runtime via window.__applePayScenario.
-            if (w.__applePayScenario === undefined) w.__applePayScenario = scenarioName;
 
             class StubApplePaySession {
                 static STATUS_SUCCESS = 0;
@@ -58,15 +58,18 @@ async function installApplePayStub(context: BrowserContext, scenario: Scenario, 
                 oncancel: (() => void) | null = null;
 
                 completeMerchantValidation(): void {}
-                completePayment(): void {}
+                completePayment(): void {
+                    if (scenarioName === 'authorizeFail') {
+                        throw new Error('stub completePayment failure');
+                    }
+                }
                 abort(): void {}
 
                 begin(): void {
-                    const scenarioNow = w.__applePayScenario as string;
                     setTimeout(() => {
-                        if (scenarioNow === 'cancel') {
+                        if (scenarioName === 'cancel') {
                             this.oncancel?.();
-                        } else if (scenarioNow === 'authorize') {
+                        } else if (scenarioName === 'authorizeFail') {
                             this.onpaymentauthorized?.({
                                 payment: { token: { paymentData: { data: tokenValue } } },
                             });
@@ -147,9 +150,14 @@ test('C8-01 merchant validation failure -> error + failed paymentResult @p1 @c8'
     const results = opEvents(events, 'paymentResult');
     const err = errors.find((e) => e.method === 'applePay' && e.stage === 'merchantValidation');
     expect(err, `error event with method=applePay stage=merchantValidation: ${JSON.stringify(errors)}`).toBeTruthy();
-    // backendCode / traceId are optional (present when the sandbox backend supplies them).
-    if (err?.error?.backendCode !== undefined) expect(typeof err.error.backendCode).toBe('string');
-    if (err?.error?.traceId !== undefined) expect(typeof err.error.traceId).toBe('string');
+    // Decision: this scenario is backend-rejection-driven (bogus validationURL rejected by
+    // the sandbox merchant-validation API, which responds with { code, traceId }), so
+    // backendCode and traceId MUST be present. Asserted strictly; if the backend stops
+    // supplying them that is a regression to investigate, not a silent pass.
+    expect(typeof err!.error?.backendCode, 'backendCode must be a string').toBe('string');
+    expect(err!.error?.backendCode, 'backendCode must be non-empty').not.toBe('');
+    expect(typeof err!.error?.traceId, 'traceId must be a string').toBe('string');
+    expect(err!.error?.traceId, 'traceId must be non-empty').not.toBe('');
 
     const failed = results.find((r) => r.outcome?.status === 'failed');
     expect(failed, `failed paymentResult: ${JSON.stringify(results)}`).toBeTruthy();
@@ -176,21 +184,27 @@ test('C8-02 user cancel -> canceled paymentResult and no error @p1 @c8', async (
     await assertNoToken(page);
 });
 
-test('C8-03 authorization token never reaches the merchant page (PCI) @p1 @c8', async ({ page, context }) => {
+test('C8-03 authorization failure -> authorization error + failed paymentResult, no token leak (PCI) @p1 @c8', async ({
+    page,
+    context,
+}) => {
     test.setTimeout(90_000);
-    await startExpress(page, context, 'authorize');
+    await startExpress(page, context, 'authorizeFail');
     await clickApplePay(page);
 
-    // The backend rejects the fake token: expect a terminal-ish signal (result or error).
     await expect
-        .poll(
-            async () => {
-                const events = await getEvents(page);
-                return opEvents(events, 'paymentResult').length + opEvents(events, 'error').length;
-            },
-            { timeout: 45_000 }
-        )
+        .poll(async () => opEvents(await getEvents(page), 'paymentResult').length, { timeout: 45_000 })
         .toBeGreaterThan(0);
+
+    const events = await getEvents(page);
+    const errors = opEvents(events, 'error');
+    const results = opEvents(events, 'paymentResult');
+    const err = errors.find((e) => e.method === 'applePay' && e.stage === 'authorization');
+    expect(err, `error event with method=applePay stage=authorization: ${JSON.stringify(errors)}`).toBeTruthy();
+    const failed = results.find((r) => r.outcome?.status === 'failed');
+    expect(failed, `failed paymentResult: ${JSON.stringify(results)}`).toBeTruthy();
+    expect(failed!.operationId).toBeTruthy();
+    expect(failed!.operationId).toBe(err!.operationId);
 
     await assertNoToken(page);
 });
