@@ -109,7 +109,6 @@ on the instance. What is emitted depends on where the failure happens:
 - A second authorization while another payment is in flight emits only `error`
   (`CHECKOUT_BUSY`) and no failed `paymentResult`.
 
-
 ```ts
 const seen = new Set<string>();
 checkout.on('paymentResult', (e) => {
