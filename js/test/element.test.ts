@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { CheckoutElement } from '../src/Element';
 import {
     ErrorCode,
     IFRAME_RESIZE_MESSAGE_TYPE,
     type AvailableWallets,
+    type ChangeEvent,
     type CommandName,
     type ElementType,
 } from '@sunbay/checkout-sdk-protocol';
@@ -817,5 +818,71 @@ describe('CheckoutElement iframe auto-resize (parent side)', () => {
             resizeEvent({ source: cw, origin: HOST_ORIGIN, data: resizeData('el_rsz', 999) })
         );
         expect(iframe.style.height).toBe('150px');
+    });
+});
+
+describe('CheckoutElement typed, element-scoped listeners', () => {
+    const change = (elementId: string): ChangeEvent => ({
+        elementId,
+        empty: false,
+        complete: true,
+    });
+
+    it('element.on(change) ignores other elementId', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_a');
+        const handler = vi.fn();
+        el.on('change', handler);
+
+        transport.emit('change', change('el_b'));
+        expect(handler).not.toHaveBeenCalled();
+
+        transport.emit('change', change('el_a'));
+        expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('delivers events without an elementId unchanged', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'expressCheckout', 'el_a');
+        const handler = vi.fn();
+        el.on('paymentStateChange', handler);
+        const evt = { operationId: 'op_1', state: 'processing' };
+        transport.emit('paymentStateChange', evt);
+        expect(handler).toHaveBeenCalledWith(evt);
+    });
+
+    it('off removes a handler registered through on (wrapper map)', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_a');
+        const handler = vi.fn();
+        el.on('change', handler);
+        el.off('change', handler);
+        transport.emit('change', change('el_a'));
+        expect(handler).not.toHaveBeenCalled();
+        expect(transport.handlers.get('change')?.size ?? 0).toBe(0);
+    });
+
+    it('destroy removes element listeners', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_a');
+        const h1 = vi.fn();
+        const h2 = vi.fn();
+        el.on('change', h1);
+        el.on('focus', h2);
+        el.destroy();
+        expect(transport.handlers.get('change')?.size ?? 0).toBe(0);
+        expect(transport.handlers.get('focus')?.size ?? 0).toBe(0);
+        transport.emit('change', change('el_a'));
+        expect(h1).not.toHaveBeenCalled();
+        expect(() => el.on('change', h1)).toThrow();
+    });
+
+    it('infers the payload type from the event name', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_a');
+        el.on('change', (e) => {
+            expectTypeOf(e).toEqualTypeOf<ChangeEvent>();
+            return e.complete;
+        });
     });
 });

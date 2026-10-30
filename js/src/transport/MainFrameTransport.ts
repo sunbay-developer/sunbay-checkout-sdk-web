@@ -52,6 +52,16 @@ export const DEFAULT_REQUEST_TIMEOUTS: RequestTimeoutConfig = {
     handshake: 15_000,
 };
 
+/**
+ * Rethrow an error from a handler asynchronously: the current dispatch loop keeps running, while
+ * the error still reaches the host page's console / `window.onerror` instead of being swallowed.
+ */
+function rethrowAsync(err: unknown): void {
+    setTimeout(() => {
+        throw err;
+    }, 0);
+}
+
 /** Event handler signature (payload is of unknown shape, refined by the caller per EventName). */
 export type EventHandler = (payload: unknown) => void;
 
@@ -361,7 +371,11 @@ export class MainFrameTransport {
         }
         if (isRuntimeHello(raw)) {
             if (this.helloHandler) {
-                this.helloHandler(raw);
+                try {
+                    this.helloHandler(raw);
+                } catch (err) {
+                    rethrowAsync(err);
+                }
             }
             return;
         }
@@ -408,8 +422,13 @@ export class MainFrameTransport {
         if (!set) {
             return;
         }
-        for (const handler of set) {
-            handler(envelope.payload);
+        // Iterate a snapshot so handlers that call on/off during dispatch cannot affect this pass.
+        for (const handler of [...set]) {
+            try {
+                handler(envelope.payload);
+            } catch (err) {
+                rethrowAsync(err);
+            }
         }
     }
 }

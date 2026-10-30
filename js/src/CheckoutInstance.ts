@@ -29,6 +29,7 @@ import {
     type ElementOptions,
     type ElementType,
     type EventName,
+    type EventPayloadMap,
     type GetPaymentStatusResp,
     type PaymentOutcome,
     type PaymentResultEvent,
@@ -283,9 +284,11 @@ export class CheckoutInstance {
      * @param handler - Callback.
      * @throws INSTANCE_DESTROYED when destroyed.
      */
-    on(event: EventName, handler: (payload: unknown) => void): void {
+    on<E extends EventName>(event: E, handler: (payload: EventPayloadMap[E]) => void): void {
         this.assertAlive();
-        this.transport.on(event, handler);
+        // The only typed→loose cast: the transport is loosely typed and the protocol guarantees the
+        // payload shape per event name. The same function identity is passed, so `off` works as is.
+        this.transport.on(event, handler as (payload: unknown) => void);
     }
 
     /**
@@ -294,8 +297,8 @@ export class CheckoutInstance {
      * @param event - Event name.
      * @param handler - The previously registered callback.
      */
-    off(event: EventName, handler: (payload: unknown) => void): void {
-        this.transport.off(event, handler);
+    off<E extends EventName>(event: E, handler: (payload: EventPayloadMap[E]) => void): void {
+        this.transport.off(event, handler as (payload: unknown) => void);
     }
 
     /**

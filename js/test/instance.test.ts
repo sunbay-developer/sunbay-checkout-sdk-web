@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { createCheckout } from '../src/createCheckout';
 import { CheckoutInstance } from '../src/CheckoutInstance';
 import {
@@ -6,6 +6,7 @@ import {
     type Appearance,
     type CommandName,
     type InitializeResp,
+    type PaymentResultEvent,
     type PaymentOutcome,
     type PublicSessionView,
     type RuntimeHello,
@@ -440,5 +441,24 @@ describe('CheckoutInstance.destroy', () => {
         ).not.toThrow();
         // The already-settled Promise result stays unchanged.
         await expect(promise).resolves.toEqual(firstOutcome);
+    });
+});
+
+describe('CheckoutInstance typed listeners', () => {
+    it('off removes a handler registered through on (wrapper map)', async () => {
+        const { instance, transport } = await bootstrap();
+        const handler = vi.fn();
+        instance.on('paymentStateChange', handler);
+        instance.off('paymentStateChange', handler);
+        transport.emit('paymentStateChange', { operationId: 'op', state: 'processing' });
+        expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('infers the payload type from the event name', async () => {
+        const { instance } = await bootstrap();
+        instance.on('paymentResult', (e) => {
+            expectTypeOf(e).toEqualTypeOf<PaymentResultEvent>();
+            return e.outcome;
+        });
     });
 });

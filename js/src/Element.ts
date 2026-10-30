@@ -26,6 +26,7 @@ import {
     type ElementStatus,
     type ElementType,
     type EventName,
+    type EventPayloadMap,
     type ExpressAvailabilityChangeEvent,
     type ExpressCheckoutElementOptions,
 } from '@sunbay/checkout-sdk-protocol';
@@ -87,6 +88,9 @@ export interface CheckoutElementOptions {
      */
     appearance?: Appearance;
 }
+
+/** A merchant handler as stored internally (loosely typed; typing lives on the public methods). */
+type UserHandler = (payload: unknown) => void;
 
 /** The common structure of an event payload (contains elementId, used to filter by the own handle). */
 interface WithElementId {
@@ -176,6 +180,9 @@ export class CheckoutElement {
     private availableWallets: AvailableWallets | undefined;
     /** expressCheckout only: the persistently subscribed expressAvailabilityChange handler (unbound on destroy). */
     private availabilityHandler: ((payload: unknown) => void) | null = null;
+
+    /** Merchant listeners registered via `on`: event → (original handler → transport wrapper). Cleared on destroy. */
+    private readonly userListeners = new Map<EventName, Map<UserHandler, UserHandler>>();
 
     /**
      * iframe auto-height: the window 'message' listener that stays resident during mount (unbound
@@ -395,6 +402,12 @@ export class CheckoutElement {
             this.transport.off('expressAvailabilityChange', this.availabilityHandler);
             this.availabilityHandler = null;
         }
+        for (const [event, wrappers] of this.userListeners) {
+            for (const wrapper of wrappers.values()) {
+                this.transport.off(event, wrapper);
+            }
+        }
+        this.userListeners.clear();
         this.removeIframe();
         this.container = null;
         this.status = 'destroyed';
@@ -428,9 +441,29 @@ export class CheckoutElement {
      * @param handler - Callback.
      * @throws INSTANCE_DESTROYED when already destroyed.
      */
-    on(event: EventName, handler: (payload: unknown) => void): void {
+    on<E extends EventName>(event: E, handler: (payload: EventPayloadMap[E]) => void): void {
         this.assertAlive();
-        this.transport.on(event, handler);
+        let wrappers = this.userListeners.get(event);
+        if (!wrappers) {
+            wrappers = new Map();
+            this.userListeners.set(event, wrappers);
+        }
+        if (wrappers.has(handler as UserHandler)) {
+            return;
+        }
+        // The only typed→loose cast: the transport is loosely typed and the protocol guarantees the
+        // payload shape per event name. The wrapper scopes delivery to this element: payloads that
+        // carry a different elementId are dropped, payloads without one pass through unchanged.
+        const typed = handler as UserHandler;
+        const wrapper = (payload: unknown): void => {
+            const target = (payload as WithElementId | null | undefined)?.elementId;
+            if (target !== undefined && target !== this.elementId) {
+                return;
+            }
+            typed(payload);
+        };
+        wrappers.set(typed, wrapper);
+        this.transport.on(event, wrapper);
     }
 
     /**
@@ -439,8 +472,14 @@ export class CheckoutElement {
      * @param event - Event name.
      * @param handler - The previously registered callback.
      */
-    off(event: EventName, handler: (payload: unknown) => void): void {
-        this.transport.off(event, handler);
+    off<E extends EventName>(event: E, handler: (payload: EventPayloadMap[E]) => void): void {
+        const wrappers = this.userListeners.get(event);
+        const wrapper = wrappers?.get(handler as UserHandler);
+        if (!wrappers || !wrapper) {
+            return;
+        }
+        wrappers.delete(handler as UserHandler);
+        this.transport.off(event, wrapper);
     }
 
     /** Focus (input classes only, not provided by expressCheckout). */

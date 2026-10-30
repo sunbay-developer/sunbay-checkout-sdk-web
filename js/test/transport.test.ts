@@ -279,6 +279,24 @@ describe('MainFrameTransport', () => {
         expect(handler).toHaveBeenCalledWith({ elementId: 'el_1' });
     });
 
+    it('handler throwing does not block others', () => {
+        vi.useFakeTimers();
+        const boom = new Error('merchant handler bug');
+        const first = vi.fn(() => {
+            throw boom;
+        });
+        const second = vi.fn();
+        transport.on('ready', first);
+        transport.on('ready', second);
+
+        expect(() => deliver(eventWire('ready', { elementId: 'el_1' }))).not.toThrow();
+        expect(first).toHaveBeenCalledTimes(1);
+        expect(second).toHaveBeenCalledWith({ elementId: 'el_1' });
+
+        // The error is rethrown asynchronously so it still surfaces to the host page.
+        expect(() => vi.runAllTimers()).toThrow(boom);
+    });
+
     it('no longer receives events after off deregisters', () => {
         const handler = vi.fn();
         transport.on('change', handler);
