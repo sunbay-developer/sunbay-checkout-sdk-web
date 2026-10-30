@@ -10,6 +10,24 @@ customers' data protected out of the box.
 server-side, hand the resulting `sessionId` to the browser, mount Elements into
 your DOM, and confirm the payment.
 
+> **Behavior changes in 0.0.6**
+>
+> - **`confirm()` now resolves only on a terminal outcome** (`succeeded` | `failed` | `canceled`).
+>   Previously it resolved on the first `paymentResult`, including a non-final `pending` one.
+>   A `pending` outcome keeps the Promise waiting. If no terminal outcome arrives within
+>   `resultTimeoutMs` (default 120000ms) it resolves `{ status: 'pending', operationId }` - this is
+>   not a failure; reconcile with `getPaymentStatus()` and never retry blindly. The confirm slot
+>   stays occupied (`CHECKOUT_BUSY`) until a terminal outcome or `destroy()`. If the `confirm`
+>   command itself times out, the Promise rejects with `paymentStateKnown: false` - reconcile, do
+>   not retry. Use `confirm({ onOperation })` to capture the `operationId` early.
+> - **`element.mount(target, { timeoutMs })`** now times out (default 30000ms, `RUNTIME_LOAD_FAILED`)
+>   and removes the iframe. `unmount()` / `destroy()` while loading reject the in-flight mount
+>   (`RUNTIME_LOAD_FAILED` / `INSTANCE_DESTROYED`), and `destroy()` releases the hosted element.
+> - **Listeners (0.0.6, typed events):** `element.on()` handlers are scoped to that element and
+>   handler errors are isolated; see the API notes for details.
+> - The handshake now only accepts messages from the SDK's own runtime iframe and ignores malformed
+>   hellos.
+
 ## Install
 
 ```bash

@@ -16,6 +16,7 @@
 
 import { MainFrameTransport } from './transport/MainFrameTransport';
 import { CheckoutInstance, type InstanceTransport } from './CheckoutInstance';
+import { isValidRuntimeHello } from './transport/hello';
 import { resolveHostOrigin, type Env } from './config/env';
 import {
     ErrorCode,
@@ -159,12 +160,13 @@ function waitForHello(transport: InstanceTransport): Promise<RuntimeHello> {
         }, HANDSHAKE_TIMEOUT_MS);
 
         transport.onHello((raw: unknown) => {
-            if (settled) {
+            if (settled || !isValidRuntimeHello(raw)) {
+                // Malformed hello: ignore and keep waiting (the handshake timeout still applies).
                 return;
             }
             settled = true;
             clearTimeout(timer);
-            resolve(raw as RuntimeHello);
+            resolve(raw);
         });
     });
 }

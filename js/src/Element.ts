@@ -89,6 +89,19 @@ export interface CheckoutElementOptions {
     appearance?: Appearance;
 }
 
+/** Default time (ms) `mount()` waits for the hosted Element to become ready. */
+export const DEFAULT_MOUNT_TIMEOUT_MS = 30_000;
+
+/** Options for {@link CheckoutElement.mount}. */
+export interface MountOptions {
+    /**
+     * Maximum time (ms) to wait for the Element to become ready. Defaults to 30000. On expiry the
+     * iframe is removed, the status becomes `loadError` and the promise rejects with
+     * `RUNTIME_LOAD_FAILED`.
+     */
+    timeoutMs?: number;
+}
+
 /** A merchant handler as stored internally (loosely typed; typing lives on the public methods). */
 type UserHandler = (payload: unknown) => void;
 
@@ -172,6 +185,11 @@ export class CheckoutElement {
     /** Event handlers temporarily subscribed during mount (unbound after resolve/reject). */
     private readyHandler: ((payload: unknown) => void) | null = null;
     private loadErrorHandler: ((payload: unknown) => void) | null = null;
+    /**
+     * Cancels the in-flight mount (clears its timer/listeners and rejects its promise). Null when no
+     * mount is in flight. Used by `unmount()` / `destroy()` while the Element is still loading.
+     */
+    private abortMount: ((reason: CheckoutError) => void) | null = null;
 
     /**
      * expressCheckout only: a snapshot of each wallet's availability.
@@ -229,13 +247,20 @@ export class CheckoutElement {
     /**
      * Mount at the merchant DOM target: insert a visible iframe, send createElement, await elementReady.
      *
+     * Failure modes: a hosted `loadError` / command failure rejects with that error; waiting longer
+     * than `opts.timeoutMs` (default 30000ms) removes the iframe and rejects `RUNTIME_LOAD_FAILED`;
+     * calling `unmount()` while loading rejects with `RUNTIME_LOAD_FAILED` ("mount cancelled");
+     * calling `destroy()` (or destroying the instance) while loading rejects `INSTANCE_DESTROYED`.
+     * A late `elementReady` after any of these is ignored and never flips the status to ready.
+     *
      * @param selectorOrEl - A CSS selector or an HTMLElement container; the container must be unique and empty.
+     * @param opts - Optional mount options (`timeoutMs`).
      * @returns Resolves after elementReady; on failure removes the node and rejects (loadError / INVALID_OPTIONS).
      * @throws INSTANCE_DESTROYED when already destroyed.
      * @example
-     * await element.mount('#card-field');
+     * await element.mount('#card-field', { timeoutMs: 20000 });
      */
-    mount(selectorOrEl: string | HTMLElement): Promise<void> {
+    mount(selectorOrEl: string | HTMLElement, opts?: MountOptions): Promise<void> {
         this.assertAlive();
 
         if (this.status === 'loading' || this.status === 'ready') {
@@ -297,8 +322,22 @@ export class CheckoutElement {
         this.iframe = iframe;
         this.installResizeListener();
 
+        const requested = opts?.timeoutMs;
+        const timeoutMs =
+            typeof requested === 'number' && Number.isFinite(requested) && requested > 0
+                ? requested
+                : DEFAULT_MOUNT_TIMEOUT_MS;
+
         return new Promise<void>((resolve, reject) => {
+            let settled = false;
+            let timer: ReturnType<typeof setTimeout> | null = null;
             const cleanup = (): void => {
+                settled = true;
+                if (timer !== null) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                this.abortMount = null;
                 if (this.readyHandler) {
                     this.transport.off('elementReady', this.readyHandler);
                     this.readyHandler = null;
@@ -310,7 +349,7 @@ export class CheckoutElement {
             };
 
             const onReady = (payload: unknown): void => {
-                if (!matchesElement(payload, this.elementId)) {
+                if (settled || !matchesElement(payload, this.elementId)) {
                     return;
                 }
                 cleanup();
@@ -324,7 +363,7 @@ export class CheckoutElement {
             };
 
             const onLoadError = (payload: unknown): void => {
-                if (!matchesElement(payload, this.elementId)) {
+                if (settled || !matchesElement(payload, this.elementId)) {
                     return;
                 }
                 cleanup();
@@ -346,6 +385,31 @@ export class CheckoutElement {
             this.transport.on('elementReady', onReady);
             this.transport.on('loadError', onLoadError);
 
+            // Cancellation by unmount()/destroy(): the caller owns status/iframe handling.
+            this.abortMount = (reason: CheckoutError): void => {
+                if (settled) {
+                    return;
+                }
+                cleanup();
+                reject(reason);
+            };
+
+            timer = setTimeout(() => {
+                if (settled) {
+                    return;
+                }
+                cleanup();
+                this.status = 'loadError';
+                this.removeIframe();
+                reject(
+                    makeError(
+                        ErrorCode.RUNTIME_LOAD_FAILED,
+                        `Element did not become ready within ${timeoutMs}ms`,
+                        this.elementId
+                    )
+                );
+            }, timeoutMs);
+
             // Send the createElement command; a command-level failure also goes through the loadError side branch.
             this.transport
                 .request('createElement', {
@@ -354,6 +418,9 @@ export class CheckoutElement {
                     options: this.options,
                 })
                 .catch((cmdErr: unknown) => {
+                    if (settled) {
+                        return;
+                    }
                     cleanup();
                     this.status = 'loadError';
                     this.removeIframe();
@@ -374,6 +441,14 @@ export class CheckoutElement {
             // Not mounted: idempotent no-op.
             return;
         }
+        // Cancel an in-flight mount first so its promise rejects and a late elementReady is ignored.
+        this.abortMount?.(
+            makeError(
+                ErrorCode.RUNTIME_LOAD_FAILED,
+                'Mount cancelled: the Element was unmounted while loading',
+                this.elementId
+            )
+        );
         try {
             await this.transport.request('destroyElement', { elementId: this.elementId });
         } finally {
@@ -390,6 +465,15 @@ export class CheckoutElement {
         if (this.status === 'destroyed') {
             return;
         }
+        const wasHosted = this.status === 'loading' || this.status === 'ready';
+        // Reject an in-flight mount (also clears its timer and listeners).
+        this.abortMount?.(
+            makeError(
+                ErrorCode.INSTANCE_DESTROYED,
+                'Mount cancelled: the Element was destroyed while loading',
+                this.elementId
+            )
+        );
         if (this.readyHandler) {
             this.transport.off('elementReady', this.readyHandler);
             this.readyHandler = null;
@@ -411,6 +495,16 @@ export class CheckoutElement {
         this.removeIframe();
         this.container = null;
         this.status = 'destroyed';
+        if (wasHosted) {
+            // Release the hosted registration; best effort (the transport may already be gone).
+            try {
+                void Promise.resolve(
+                    this.transport.request('destroyElement', { elementId: this.elementId })
+                ).catch(() => undefined);
+            } catch {
+                // Ignore: destroy() must never throw.
+            }
+        }
         // Notify the instance to remove itself from the mutual-exclusion registry, freeing the slot to allow recreating a mutually-exclusive Element of the same kind after destruction.
         this.onDestroy?.(this.elementId);
     }

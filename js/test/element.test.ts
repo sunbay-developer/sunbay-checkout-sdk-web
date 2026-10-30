@@ -802,7 +802,8 @@ describe('CheckoutElement iframe auto-resize (parent side)', () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_rsz');
         const container = makeContainer('t-rsz-destroy');
-        void el.mount(container);
+        // destroy() while loading now rejects the in-flight mount; swallow it here.
+        el.mount(container).catch(() => undefined);
         const iframe = container.querySelector('iframe') as HTMLIFrameElement;
         const cw = fixContentWindow(iframe);
 

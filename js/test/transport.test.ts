@@ -87,7 +87,9 @@ function eventWire(name: string, payload: unknown, checkoutId = CHECKOUT_ID): st
 
 /** Simulate delivering a message to window from the hosted page. */
 function deliver(data: string, origin = HOST_ORIGIN): void {
-    window.dispatchEvent(new MessageEvent('message', { data, origin }));
+    // The transport only accepts messages whose source is its own main iframe window.
+    const source = document.body.querySelector('iframe')?.contentWindow ?? null;
+    window.dispatchEvent(new MessageEvent('message', { data, origin, source }));
 }
 
 describe('MainFrameTransport', () => {

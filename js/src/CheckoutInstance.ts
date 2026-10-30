@@ -78,14 +78,38 @@ export interface CheckoutInstanceOptions {
     appearance?: Appearance;
 }
 
-/** Optional confirm parameters (aligned with ConfirmReq, minus the instance-generated operationId). */
-export type ConfirmOptions = Omit<ConfirmReq, 'operationId'>;
+/** Default time (ms) `confirm()` waits for a terminal outcome before resolving `pending`. */
+export const CONFIRM_RESULT_DEADLINE_MS = 120_000;
+
+/**
+ * Optional confirm parameters (aligned with ConfirmReq, minus the instance-generated operationId,
+ * plus two SDK-only options that are never sent to the runtime).
+ */
+export type ConfirmOptions = Omit<ConfirmReq, 'operationId'> & {
+    /**
+     * Called synchronously with the generated operationId, before the `confirm` command is sent.
+     * Lets the merchant persist the id early (e.g. to reconcile after a timeout or page reload).
+     */
+    onOperation?: (operationId: string) => void;
+    /**
+     * Per-call override of the result watchdog in milliseconds (default
+     * {@link CONFIRM_RESULT_DEADLINE_MS}). Must be a positive finite number, otherwise the default
+     * applies.
+     */
+    resultTimeoutMs?: number;
+};
 
 /** Pairing record for a pending confirm. */
 interface PendingConfirm {
     operationId: string;
+    /** Whether the merchant-facing Promise has already settled (the slot may still be held). */
+    settled: boolean;
     resolve: (outcome: PaymentOutcome) => void;
     reject: (reason: CheckoutError) => void;
+    /** Result watchdog timer. */
+    watchdog: ReturnType<typeof setTimeout> | null;
+    /** txnId of the most recent non-terminal `pending` outcome, if any. */
+    lastPendingTxnId: string | undefined;
 }
 
 /** The set of split card field types. */
@@ -192,12 +216,36 @@ export class CheckoutInstance {
     }
 
     /**
-     * Initiate a payment confirmation. Generates an operationId, sends the confirm command to obtain
-     * accepted, and the returned Promise is fulfilled by a later paymentResult event with the same
-     * operationId. Calling again while in progress → CHECKOUT_BUSY.
+     * Initiate a payment confirmation. Generates an operationId, sends the `confirm` command, and
+     * returns a Promise fulfilled by `paymentResult` events with the same operationId.
      *
-     * @param opts - Optional parameters such as billing/shipping address, name, email, returnUrl.
-     * @returns The terminal PaymentOutcome.
+     * Behavior changes in 0.0.6: previously the Promise resolved on the first `paymentResult`,
+     * including a non-final `pending` outcome. Now it resolves ONLY on a terminal outcome
+     * (`succeeded` | `failed` | `canceled`); a `pending` outcome keeps it waiting.
+     *
+     * Watchdog: if no terminal outcome arrives within `resultTimeoutMs` (default
+     * {@link CONFIRM_RESULT_DEADLINE_MS} = 120000ms) the Promise resolves
+     * `{ status: 'pending', operationId, txnId? }`. This is NOT a failure: the payment may still
+     * complete, so never treat it as failed and never retry blindly. Reconcile with
+     * `getPaymentStatus()` or the `paymentResult` event.
+     *
+     * Slot semantics (duplicate-submit protection): the confirm slot stays occupied until a
+     * terminal outcome arrives or `destroy()` is called. While it is occupied another `confirm()`
+     * rejects with `CHECKOUT_BUSY`; this also holds after the watchdog resolved `pending`, and later
+     * terminal outcomes are still delivered through `on('paymentResult', ...)`.
+     *
+     * If the `confirm` command is rejected by the runtime the payment was not started: the Promise
+     * rejects with that error and the slot is freed. If the command itself times out
+     * (`REQUEST_TIMEOUT`) the runtime may have started the payment: the Promise rejects with the
+     * error augmented with `paymentStateKnown: false`, the slot stays occupied and a later terminal
+     * `paymentResult` for this operation frees it. Do not retry; reconcile with `getPaymentStatus()`.
+     *
+     * `error` events with `paymentStateKnown === false` are informational and do not settle the
+     * Promise.
+     *
+     * @param opts - Optional billing/shipping address, name, email, returnUrl, plus `onOperation`
+     *               and `resultTimeoutMs`.
+     * @returns The terminal PaymentOutcome, or `{ status: 'pending' }` when the watchdog fires.
      * @throws rejects INSTANCE_DESTROYED when destroyed; rejects CHECKOUT_BUSY when in progress.
      */
     confirm(opts?: ConfirmOptions): Promise<PaymentOutcome> {
@@ -212,18 +260,74 @@ export class CheckoutInstance {
             );
         }
 
+        // SDK-only options never go on the wire.
+        const { onOperation, resultTimeoutMs, ...rest } = opts ?? {};
         const operationId = genId('op');
-        const payload: ConfirmReq = { ...opts, operationId };
+        const payload: ConfirmReq = { ...rest, operationId };
+        const deadline =
+            typeof resultTimeoutMs === 'number' && Number.isFinite(resultTimeoutMs) && resultTimeoutMs > 0
+                ? resultTimeoutMs
+                : CONFIRM_RESULT_DEADLINE_MS;
 
         return new Promise<PaymentOutcome>((resolve, reject) => {
             // Reserve the slot first, to prevent a concurrent confirm before accepted.
-            this.pendingConfirm = { operationId, resolve, reject };
-            this.transport.request('confirm', payload).catch((err: unknown) => {
-                // The confirm command itself failed: clear the reservation and reject (paymentResult won't arrive).
-                if (this.pendingConfirm && this.pendingConfirm.operationId === operationId) {
-                    this.pendingConfirm = null;
+            const entry: PendingConfirm = {
+                operationId,
+                settled: false,
+                resolve,
+                reject,
+                watchdog: null,
+                lastPendingTxnId: undefined,
+            };
+            this.pendingConfirm = entry;
+
+            entry.watchdog = setTimeout(() => {
+                entry.watchdog = null;
+                if (entry.settled) {
+                    return;
                 }
-                reject(err as CheckoutError);
+                entry.settled = true;
+                // Not a failure and not a rejection: the state is unknown. The slot stays held.
+                const outcome: PaymentOutcome =
+                    entry.lastPendingTxnId !== undefined
+                        ? { status: 'pending', operationId, txnId: entry.lastPendingTxnId }
+                        : { status: 'pending', operationId };
+                resolve(outcome);
+            }, deadline);
+
+            // Expose the operation id before the command leaves; a throwing callback must not break
+            // the payment flow, so surface its error asynchronously.
+            if (typeof onOperation === 'function') {
+                try {
+                    onOperation(operationId);
+                } catch (err) {
+                    setTimeout(() => {
+                        throw err;
+                    }, 0);
+                }
+            }
+
+            this.transport.request('confirm', payload).catch((err: unknown) => {
+                if (this.pendingConfirm !== entry) {
+                    return;
+                }
+                const error = err as CheckoutError;
+                if (error && error.code === ErrorCode.REQUEST_TIMEOUT) {
+                    // The runtime may have started the payment: keep the slot, mark state unknown.
+                    if (!entry.settled) {
+                        entry.settled = true;
+                        this.clearWatchdog(entry);
+                        reject({ ...error, paymentStateKnown: false });
+                    }
+                    return;
+                }
+                // The runtime did not accept the command: free the slot and reject.
+                this.pendingConfirm = null;
+                this.clearWatchdog(entry);
+                if (!entry.settled) {
+                    entry.settled = true;
+                    reject(error);
+                }
             });
         });
     }
@@ -324,10 +428,15 @@ export class CheckoutInstance {
 
         // Reject the pending confirm with INSTANCE_DESTROYED.
         if (this.pendingConfirm) {
-            this.pendingConfirm.reject(
-                makeError(ErrorCode.INSTANCE_DESTROYED, 'Checkout instance has been destroyed', 'runtime')
-            );
+            const entry = this.pendingConfirm;
             this.pendingConfirm = null;
+            this.clearWatchdog(entry);
+            if (!entry.settled) {
+                entry.settled = true;
+                entry.reject(
+                    makeError(ErrorCode.INSTANCE_DESTROYED, 'Checkout instance has been destroyed', 'runtime')
+                );
+            }
         }
 
         // Notify the hosted side and destroy the transport (request after destroy is rejected by the transport itself).
@@ -423,10 +532,36 @@ export class CheckoutInstance {
         if (evt.operationId !== pending.operationId) {
             return;
         }
-        if (!evt.outcome) {
+        const outcome = evt.outcome;
+        if (!outcome) {
             return;
         }
+        if (outcome.status === 'pending') {
+            // Non-terminal: keep waiting (and keep the slot) for the final outcome.
+            pending.lastPendingTxnId = outcome.txnId ?? pending.lastPendingTxnId;
+            return;
+        }
+        if (
+            outcome.status !== 'succeeded' &&
+            outcome.status !== 'failed' &&
+            outcome.status !== 'canceled'
+        ) {
+            return;
+        }
+        // Terminal: free the slot; settle the Promise unless the watchdog/timeout already did.
         this.pendingConfirm = null;
-        pending.resolve(evt.outcome);
+        this.clearWatchdog(pending);
+        if (!pending.settled) {
+            pending.settled = true;
+            pending.resolve(outcome);
+        }
+    }
+
+    /** Clear a pending confirm's watchdog timer (idempotent). */
+    private clearWatchdog(entry: PendingConfirm): void {
+        if (entry.watchdog !== null) {
+            clearTimeout(entry.watchdog);
+            entry.watchdog = null;
+        }
     }
 }

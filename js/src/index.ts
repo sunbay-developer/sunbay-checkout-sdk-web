@@ -20,7 +20,7 @@ export type {
 } from './CheckoutInstance';
 
 export { CheckoutElement } from './Element';
-export type { CheckoutElementOptions, ElementTransport } from './Element';
+export type { CheckoutElementOptions, ElementTransport, MountOptions } from './Element';
 
 export type { Env } from './config/env';
 

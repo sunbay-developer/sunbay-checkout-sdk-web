@@ -5,8 +5,9 @@
  * - Create a hidden, 0-size main iframe (`${hostOrigin}/sdk/main?checkoutId=...`).
  * - Send request envelopes and pair responses by `requestId` (resolve/reject).
  * - Dispatch `kind:'event'` envelopes to handlers registered via `on`.
- * - Enforce the security boundary: only accept messages whose `event.origin === hostOrigin` and
- *   whose envelope `checkoutId` matches.
+ * - Enforce the security boundary: only accept messages whose `event.origin === hostOrigin`,
+ *   whose `event.source` is this transport's own main iframe window, whose envelope `checkoutId`
+ *   matches and (after the handshake) whose `runtimeId` matches the negotiated one.
  * - `destroy()` cleans up the iframe/listener and rejects all pending requests with INSTANCE_DESTROYED.
  *
  * Security constraint (AGENTS/spec): envelopes **never contain card values**; this layer only
@@ -28,6 +29,7 @@ import {
     type RuntimeHello,
 } from '@sunbay/checkout-sdk-protocol';
 import { ErrorCode } from '@sunbay/checkout-sdk-protocol';
+import { isValidRuntimeHello } from './hello';
 
 /** Constructor parameters. */
 export interface MainFrameTransportOptions {
@@ -240,7 +242,8 @@ export class MainFrameTransport {
 
     /**
      * Register the handshake (RuntimeHello) callback. The hello phase has no checkoutId yet and is
-     * handled separately.
+     * handled separately. The callback is one-shot: it is cleared after the first valid hello from
+     * this transport's own iframe; malformed hellos are ignored.
      *
      * @param handler - Called when a hello is received.
      */
@@ -362,6 +365,14 @@ export class MainFrameTransport {
             return;
         }
 
+        // Security boundary: hello and envelopes must come from this instance's own main iframe
+        // window. This keeps concurrent checkout instances (each with its own iframe) from
+        // adopting each other's hello/runtimeId, and rejects same-origin lookalike windows.
+        const mainWindow = this.iframe?.contentWindow;
+        if (!mainWindow || event.source !== mainWindow) {
+            return;
+        }
+
         // The handshake hello is parsed separately (not via the Envelope union; no checkoutId at this phase).
         let raw: unknown;
         try {
@@ -370,9 +381,17 @@ export class MainFrameTransport {
             return;
         }
         if (isRuntimeHello(raw)) {
-            if (this.helloHandler) {
+            // A malformed hello is ignored (it neither throws nor consumes the one-shot handler).
+            if (!isValidRuntimeHello(raw)) {
+                return;
+            }
+            // One-shot: the first valid hello is consumed; later hellos (e.g. a dev double mount
+            // or a reloaded runtime) are ignored so the negotiated runtimeId cannot be swapped.
+            const handler = this.helloHandler;
+            this.helloHandler = null;
+            if (handler) {
                 try {
-                    this.helloHandler(raw);
+                    handler(raw);
                 } catch (err) {
                     rethrowAsync(err);
                 }
@@ -390,6 +409,12 @@ export class MainFrameTransport {
 
         // Security boundary: the envelope checkoutId must match this instance.
         if (envelope.checkoutId !== this.checkoutId) {
+            return;
+        }
+
+        // Once a runtimeId is negotiated, drop response/event envelopes from any other runtime
+        // instance (the runtime stamps every response and event with its own runtimeId).
+        if (this.runtimeId !== '' && envelope.runtimeId !== this.runtimeId) {
             return;
         }
 
