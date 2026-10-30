@@ -119,6 +119,7 @@ async function createSession(input) {
         collectShippingAddress: input.collectShippingAddress ?? false,
         merchantReturnUrl: input.returnUrl ?? '',
         notifyUrl: input.returnUrl ?? '',
+        sessionType: 'embedded',
     };
 
     const res = await fetch(`${CONFIG.openApiUrl}/v1/checkout/create-session`, {
@@ -206,7 +207,11 @@ const server = createServer(async (req, res) => {
             }
             try {
                 const data = await createSession(input);
-                sendJson(res, 200, { sessionId: data.sessionId, session: data });
+                sendJson(res, 200, {
+                    sessionId: data.sessionId,
+                    checkoutClientSecret: data.checkoutClientSecret,
+                    session: data,
+                });
             } catch (err) {
                 sendJson(res, 502, { error: err.message, detail: err.detail });
             }

@@ -20,6 +20,8 @@ export interface ElementSpec {
 }
 export interface HarnessConfig {
     session: 'auto' | string;
+    /** Required when `session` is a fixed id (not 'auto'); 'auto' takes it from create-session. */
+    checkoutClientSecret?: string;
     instanceKey?: string;
     env?: 'dev' | 'test' | 'prod';
     hostOrigin?: string;

@@ -107,7 +107,7 @@ class Harness {
     /**
      * Create a sandbox session via the test backend, with a small retry to absorb
      * transient open-platform / network blips (observed as intermittent "fetch
-     * failed" / 5xx). Returns { ok, sessionId } or { ok:false, error }.
+     * failed" / 5xx). Returns { ok, sessionId, checkoutClientSecret } or { ok:false, error }.
      */
     async _createSession(config, attempts = 3) {
         let lastError = 'unknown';
@@ -128,10 +128,17 @@ class Harness {
                     if (res.status === 503) break;
                 } else {
                     const body = await res.json();
-                    if (body.sessionId) {
-                        return { ok: true, sessionId: body.sessionId };
+                    if (!body.sessionId) {
+                        lastError = 'create-session returned no sessionId';
+                    } else if (!body.checkoutClientSecret) {
+                        lastError = 'create-session returned no checkoutClientSecret';
+                    } else {
+                        return {
+                            ok: true,
+                            sessionId: body.sessionId,
+                            checkoutClientSecret: body.checkoutClientSecret,
+                        };
                     }
-                    lastError = 'create-session returned no sessionId';
                 }
             } catch (err) {
                 lastError = String(err);
@@ -160,16 +167,19 @@ class Harness {
         const key = config.instanceKey ?? DEFAULT_KEY;
         const hostOrigin = resolveHostOrigin(config.hostOrigin);
 
-        // 1. Obtain a sessionId.
+        // 1. Obtain a sessionId + checkoutClientSecret.
         let sessionId;
+        let checkoutClientSecret;
         if (config.session === 'auto') {
             const created = await this._createSession(config);
             if (!created.ok) {
                 return { ok: false, error: created.error };
             }
             sessionId = created.sessionId;
+            checkoutClientSecret = created.checkoutClientSecret;
         } else {
             sessionId = config.session;
+            checkoutClientSecret = config.checkoutClientSecret;
         }
 
         // 2. createCheckout.
@@ -178,6 +188,7 @@ class Harness {
         try {
             instance = await createCheckout({
                 sessionId,
+                checkoutClientSecret,
                 env: config.env,
                 hostOrigin,
                 locale: config.locale,

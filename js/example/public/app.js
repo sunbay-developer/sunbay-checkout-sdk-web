@@ -87,7 +87,8 @@ export function getCreateCheckout() {
  *
  * @param {{ collectBillingAddress?: boolean, collectShippingAddress?: boolean,
  *           items?: object[], currency?: string }} [variant] - Session variant.
- * @returns {Promise<string>} the created sessionId.
+ * @returns {Promise<{ sessionId: string, checkoutClientSecret: string }>} the created session
+ *          id and its client secret (never log the secret).
  * @throws {Error} with a readable message when the backend returns non-2xx.
  */
 export async function createSession(variant = {}) {
@@ -97,10 +98,10 @@ export async function createSession(variant = {}) {
         body: JSON.stringify(variant),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.sessionId) {
+    if (!res.ok || !body.sessionId || !body.checkoutClientSecret) {
         throw new Error(body.error || `create-session failed (HTTP ${res.status})`);
     }
-    return body.sessionId;
+    return { sessionId: body.sessionId, checkoutClientSecret: body.checkoutClientSecret };
 }
 
 /**

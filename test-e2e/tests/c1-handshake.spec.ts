@@ -57,7 +57,12 @@ test('C1-03 protocol major mismatch -> PROTOCOL_UNSUPPORTED @p1 @c1 @optional', 
 
     // Error path: handshake fails before initialize, so a real session is not
     // required — use a fixed fake sessionId to keep this credential-independent.
-    const result = await setup(page, { session: 'e2e-fake-session', hostOrigin: STUB_ORIGIN, elements: [] });
+    const result = await setup(page, {
+        session: 'e2e-fake-session',
+        checkoutClientSecret: 'e2e-fake-secret',
+        hostOrigin: STUB_ORIGIN,
+        elements: [],
+    });
     expect(result.ok).toBe(false);
     expect(result.error?.code).toBe('PROTOCOL_UNSUPPORTED');
     // No lingering main iframe.
@@ -72,7 +77,12 @@ test('C1-04 unreachable runtime -> RUNTIME_LOAD_FAILED @p1 @c1 @optional', async
 
     // Error path: the handshake times out before initialize, so no real session
     // is needed — use a fixed fake sessionId (credential-independent).
-    const result = await setup(page, { session: 'e2e-fake-session', hostOrigin: BLACKHOLE_ORIGIN, elements: [] });
+    const result = await setup(page, {
+        session: 'e2e-fake-session',
+        checkoutClientSecret: 'e2e-fake-secret',
+        hostOrigin: BLACKHOLE_ORIGIN,
+        elements: [],
+    });
     expect(result.ok).toBe(false);
     expect(result.error?.code).toBe('RUNTIME_LOAD_FAILED');
 });

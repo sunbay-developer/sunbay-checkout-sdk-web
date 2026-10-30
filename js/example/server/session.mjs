@@ -111,6 +111,7 @@ export async function createSession(input = {}) {
         collectShippingAddress: input.collectShippingAddress ?? false,
         merchantReturnUrl: input.returnUrl ?? '',
         notifyUrl: input.returnUrl ?? '',
+        sessionType: 'embedded',
     };
 
     const res = await fetch(`${CONFIG.openApiUrl}/v1/checkout/create-session`, {

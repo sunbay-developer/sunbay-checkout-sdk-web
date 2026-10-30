@@ -62,7 +62,7 @@ els.init.addEventListener('click', async () => {
     try {
         // Request both billing and shipping collection so both address Elements
         // have a corresponding session field.
-        const sessionId = await createSession({
+        const { sessionId, checkoutClientSecret } = await createSession({
             collectBillingAddress: true,
             collectShippingAddress: true,
         });
@@ -70,7 +70,11 @@ els.init.addEventListener('click', async () => {
 
         const createCheckout = getCreateCheckout();
         setStatus('Handshaking…');
-        checkout = await createCheckout({ sessionId, hostOrigin: health.hostedOrigin });
+        checkout = await createCheckout({
+            sessionId,
+            checkoutClientSecret,
+            hostOrigin: health.hostedOrigin,
+        });
         log('checkout ready', { checkoutId: checkout.checkoutId });
 
         const session = await checkout.getSession();

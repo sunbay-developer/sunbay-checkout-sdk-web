@@ -53,7 +53,9 @@ els.init.addEventListener('click', async () => {
     setStatus('Creating session…');
     try {
         // 1) The merchant backend creates a session with the sandbox key.
-        const sessionId = await createSession({ collectBillingAddress: true });
+        const { sessionId, checkoutClientSecret } = await createSession({
+            collectBillingAddress: true,
+        });
         log('session created', { sessionId });
 
         // 2) Boot the SDK against the hosted runtime.
@@ -61,6 +63,7 @@ els.init.addEventListener('click', async () => {
         setStatus('Handshaking with hosted runtime…');
         checkout = await createCheckout({
             sessionId,
+            checkoutClientSecret,
             hostOrigin: health.hostedOrigin,
         });
         log('checkout ready', { checkoutId: checkout.checkoutId, capabilities: checkout.capabilities });

@@ -86,9 +86,10 @@ function status(id, text, kind) {
 /** Shared bootstrap: create a session + instance pointed at the hosted runtime. */
 async function boot(appearance) {
     if (!createCheckout) throw new Error('SDK not loaded');
-    const sessionId = await createSession({ collectBillingAddress: true });
+    const { sessionId, checkoutClientSecret } = await createSession({ collectBillingAddress: true });
     const instance = await createCheckout({
         sessionId,
+        checkoutClientSecret,
         hostOrigin: health.hostedOrigin,
         appearance,
     });
