@@ -10,6 +10,7 @@ import type {
     AvailableWallets,
     CheckoutError,
     PaymentAction,
+    WalletErrorStage,
     PaymentMethod,
     PaymentOutcome,
 } from './types';
@@ -100,6 +101,10 @@ export interface PaymentResultEvent {
 export interface ErrorEvent {
     /** Error in an asynchronous proactive flow; may include operationId (if already created). */
     operationId?: string;
+    /** Payment method the error relates to, if any. */
+    method?: PaymentMethod;
+    /** Wallet flow stage in which the error occurred, if applicable. */
+    stage?: WalletErrorStage;
     error: CheckoutError;
 }
 

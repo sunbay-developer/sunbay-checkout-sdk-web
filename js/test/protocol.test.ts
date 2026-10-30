@@ -4,6 +4,8 @@ import {
     encodeEnvelope,
     ErrorCode,
     type Envelope,
+    type ErrorEvent,
+    type WalletErrorStage,
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
@@ -517,5 +519,48 @@ describe('protocol expressCheckout buttonType + buttonHeight', () => {
             },
         };
         expect(opts).toBeDefined();
+    });
+});
+
+describe('error event wallet diagnostics', () => {
+    const wrap = (payload: unknown): Envelope => ({
+        protocol: 'sunbay-checkout',
+        major: 1,
+        runtimeId: 'rt_1',
+        checkoutId: 'co_1',
+        kind: 'event',
+        eventId: 'ev_1',
+        name: 'error',
+        payload,
+    });
+
+    const payloadOf = (e: Envelope): unknown => (e.kind === 'event' ? e.payload : undefined);
+
+    it('decodeEnvelope accepts error event with method/stage/backendCode', () => {
+        const stage: WalletErrorStage = 'merchantValidation';
+        const payload: ErrorEvent = {
+            operationId: 'op_1',
+            method: 'applePay',
+            stage,
+            error: {
+                code: 'payment_failed',
+                message: 'failed',
+                category: 'payment',
+                errorId: 'err_1',
+                providerCode: 'InvalidAccessError',
+                backendCode: '1234',
+                paymentStateKnown: false,
+            },
+        };
+        const decoded = decodeEnvelope(encodeEnvelope(wrap(payload)));
+        expect(payloadOf(decoded)).toEqual(payload);
+    });
+
+    it('old error payload without new fields still decodes', () => {
+        const payload: ErrorEvent = {
+            error: { code: 'x', message: 'm', category: 'runtime', errorId: 'e' },
+        };
+        const decoded = decodeEnvelope(encodeEnvelope(wrap(payload)));
+        expect(payloadOf(decoded)).toEqual(payload);
     });
 });

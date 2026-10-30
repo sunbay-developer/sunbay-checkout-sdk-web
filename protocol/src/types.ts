@@ -95,6 +95,17 @@ export type CheckoutErrorCategory =
     | 'payment';
 
 /**
+ * Stage of the wallet (express checkout) flow in which an error occurred.
+ */
+export type WalletErrorStage =
+    | 'availability'
+    | 'merchantValidation'
+    | 'authorization'
+    | 'submit'
+    | 'poll'
+    | 'runtime';
+
+/**
  * Structured error (spec 5.4).
  */
 export interface CheckoutError {
@@ -106,6 +117,17 @@ export interface CheckoutError {
     elementId?: string;
     field?: string;
     traceId?: string;
+    /**
+     * Wallet-provider error name/code (sanitized string; never a raw provider object).
+     */
+    providerCode?: string;
+    /** Backend business code passthrough. */
+    backendCode?: string;
+    /**
+     * `false` means the payment outcome is unknown and the merchant must NOT blindly retry;
+     * reconcile with `getPaymentStatus` first.
+     */
+    paymentStateKnown?: boolean;
 }
 
 /**

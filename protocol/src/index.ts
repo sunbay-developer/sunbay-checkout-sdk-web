@@ -74,6 +74,7 @@ export {
     type PaymentOutcome,
     type CheckoutError,
     type CheckoutErrorCategory,
+    type WalletErrorStage,
     type Appearance,
     type AppearanceVariables,
     type AppearanceRuleTarget,
