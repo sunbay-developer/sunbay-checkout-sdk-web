@@ -170,9 +170,6 @@ challenges: it only emits the event. Your page must handle the action.
   (`RUNTIME_LOAD_FAILED` / `INSTANCE_DESTROYED`). If you call `mount()` without
   `catch`/`await`, that surfaces as an **unhandled rejection**; always handle it.
 - `checkout.updateCheckout({ locale?, appearance? })` hot-switches locale/appearance.
-- `checkout.session` is the session snapshot (`PublicSessionView`), available synchronously as soon
-  as `createCheckout()` resolves, with no extra round trip. It is replaced whenever `getSession()` or
-  `refresh()` succeeds, and stays readable after `destroy()` (last known value).
 - `getSession()`, `refresh()`, `getPaymentStatus()` read session/payment state.
 - `checkout.destroy()` is idempotent, removes all iframes, and later calls reject/throw
   `INSTANCE_DESTROYED`. Calling `destroy()` while a `confirm()` is pending rejects that

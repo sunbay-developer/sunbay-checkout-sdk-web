@@ -168,41 +168,6 @@ describe('createCheckout', () => {
         expect(session.sessionId).toBe('sess_1');
     });
 
-    it('exposes the initialize session synchronously on the instance', async () => {
-        const { instance, transport } = await bootstrap();
-        // No extra command is needed: the snapshot comes from the initialize response.
-        expect(instance.session).toEqual(makeSession());
-        expect(transport.requests.map((r) => r.name)).toEqual(['initialize']);
-    });
-
-    it('session snapshot follows getSession() and refresh()', async () => {
-        const { instance } = await bootstrap((t) => {
-            t.requestImpl = (name): Promise<unknown> => {
-                if (name === 'initialize') {
-                    return Promise.resolve({ capabilities: ['card'], session: makeSession() });
-                }
-                if (name === 'getSession') {
-                    return Promise.resolve({ ...makeSession(), totalAmount: 1500 });
-                }
-                if (name === 'refresh') {
-                    return Promise.resolve({ ...makeSession(), totalAmount: 2000 });
-                }
-                return Promise.resolve({});
-            };
-        });
-        expect(instance.session.totalAmount).toBe(1000);
-        await instance.getSession();
-        expect(instance.session.totalAmount).toBe(1500);
-        await instance.refresh();
-        expect(instance.session.totalAmount).toBe(2000);
-    });
-
-    it('session stays readable after destroy() (last known snapshot)', async () => {
-        const { instance } = await bootstrap();
-        instance.destroy();
-        expect(instance.session.sessionId).toBe('sess_1');
-    });
-
     it('hello timeout (no handshake) rejects RUNTIME_LOAD_FAILED', async () => {
         vi.useFakeTimers();
         const transport = createMockTransport();
