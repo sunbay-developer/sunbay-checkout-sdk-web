@@ -114,7 +114,7 @@ describe('MainFrameTransport', () => {
     it('createHiddenIframe creates a hidden zero-size iframe attached to body, src carries checkoutId', () => {
         const iframe = document.body.querySelector('iframe');
         expect(iframe).not.toBeNull();
-        expect(iframe!.src).toBe(`${HOST_ORIGIN}/sdk/main?checkoutId=${CHECKOUT_ID}`);
+        expect(iframe!.src).toBe(`${HOST_ORIGIN}/embed/sdk/main?checkoutId=${CHECKOUT_ID}`);
     });
 
     it('request sends a request envelope: contains name/payload/requestId, postMessage to iframe', () => {

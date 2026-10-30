@@ -30,7 +30,7 @@ test('C2-01 combined card element mounts @p0 @c2', async ({ page }) => {
     const r = await setup(page, { session: 'auto', elements: [{ type: 'card', slot: '#slot-card' }] });
     expect(r.ok, r.error?.message).toBe(true);
     expect(r.mountStatus?.['#slot-card']).toBe('ready');
-    expect(await slotIframeSrc(page, '#slot-card')).toContain('/sdk/element/card');
+    expect(await slotIframeSrc(page, '#slot-card')).toContain('/embed/sdk/element/card');
     expect(await elementStatus(page, '#slot-card')).toBe('ready');
     const events = await getEvents(page);
     expect(events.some((e) => e.source === '#slot-card' && e.name === 'elementReady')).toBe(true);
@@ -46,9 +46,9 @@ test('C2-02 split three fields mount @p0 @c2', async ({ page }) => {
         ],
     });
     expect(r.ok, r.error?.message).toBe(true);
-    expect(await slotIframeSrc(page, '#slot-num')).toContain('/sdk/field/cardNumber');
-    expect(await slotIframeSrc(page, '#slot-exp')).toContain('/sdk/field/cardExpiry');
-    expect(await slotIframeSrc(page, '#slot-cvc')).toContain('/sdk/field/cardCvc');
+    expect(await slotIframeSrc(page, '#slot-num')).toContain('/embed/sdk/field/cardNumber');
+    expect(await slotIframeSrc(page, '#slot-exp')).toContain('/embed/sdk/field/cardExpiry');
+    expect(await slotIframeSrc(page, '#slot-cvc')).toContain('/embed/sdk/field/cardCvc');
     const events = await getEvents(page);
     for (const slot of ['#slot-num', '#slot-exp', '#slot-cvc']) {
         expect(events.filter((e) => e.source === slot && e.name === 'elementReady').length).toBe(1);
@@ -64,8 +64,8 @@ test('C2-03 address billing + shipping @p1 @c2', async ({ page }) => {
         ],
     });
     expect(r.ok, r.error?.message).toBe(true);
-    expect(await slotIframeSrc(page, '#slot-bill')).toContain('/sdk/element/address');
-    expect(await slotIframeSrc(page, '#slot-ship')).toContain('/sdk/element/address');
+    expect(await slotIframeSrc(page, '#slot-bill')).toContain('/embed/sdk/element/address');
+    expect(await slotIframeSrc(page, '#slot-ship')).toContain('/embed/sdk/element/address');
     const modes = await page.evaluate(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const h = (window as any).__sunbayHarness;
@@ -81,7 +81,7 @@ test('C2-04 expressCheckout mounts + availability @p1 @c2', async ({ page }) => 
         elements: [{ type: 'expressCheckout', slot: '#slot-express' }],
     });
     expect(r.ok, r.error?.message).toBe(true);
-    expect(await slotIframeSrc(page, '#slot-express')).toContain('/sdk/element/expressCheckout');
+    expect(await slotIframeSrc(page, '#slot-express')).toContain('/embed/sdk/element/expressCheckout');
     const events = await getEvents(page);
     expect(events.some((e) => e.source === '#slot-express' && e.name === 'elementReady')).toBe(true);
     const wallets = await availableWallets(page, '#slot-express');

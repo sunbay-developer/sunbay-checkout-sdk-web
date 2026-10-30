@@ -55,8 +55,8 @@ The test infrastructure is self-contained in this `test-e2e/` directory.
 
 ```
 Test harness page            Test backend                 Sunbay platform + hosted runtime
-  standard merchant-page        creates sessions with         create-session API / /sdk/main
-  simulator                     the sandbox merchant key       /sdk/field/* /sdk/element/*
+  standard merchant-page        creates sessions with         create-session API / /embed/sdk/main
+  simulator                     the sandbox merchant key       /embed/embed/sdk/field/* /embed/embed/sdk/element/*
   standalone origin (:8090)     /api/create-session           (hosted runtime, default :3000)
         |                          |  (key stays server-side)            |
         | (1) POST /api/create-session                                   |
@@ -89,9 +89,10 @@ cross-origin postMessage, `event.origin` checks, and cross-iframe channels:
 
 ## 3. Prerequisites
 
-1. **Hosted runtime reachable**, serving `/sdk/main`, `/sdk/field/<type>`,
-   `/sdk/element/<type>`. Locally use the `checkout` repo's `npm run dev` (:3000);
-   or point at a deployed environment.
+1. **Hosted runtime reachable**, serving `/embed/sdk/main`, `/embed/sdk/field/<type>`,
+   `/embed/sdk/element/<type>`. Locally use the `checkout` repo's `npm run dev` (:3000);
+   or point at a deployed environment. The runtime also keeps a legacy `/sdk/*` alias
+   (used by SDK <= 0.0.5); the SDK under test loads `/embed/sdk/*` only.
    > Long-running processes (dev server) are started manually by the user; the
    > test runner does not start them in the background.
 2. **SDK IIFE build present**: `js/dist/index.global.js`

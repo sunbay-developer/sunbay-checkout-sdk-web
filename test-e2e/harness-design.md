@@ -18,7 +18,7 @@
 |---|---|---|
 | `harness.html` + `harness.mjs` | Harness page: loads the SDK IIFE build, exposes `window.__sunbayHarness`, provides mount slots | `http://localhost:8090` |
 | `server/server.mjs` | Test backend: holds the sandbox merchant key, `POST /api/create-session` returns a `sessionId` | same origin as the harness |
-| hosted runtime | Hosts `/sdk/main`, `/sdk/field/*`, `/sdk/element/*` | `http://localhost:3000` or a real environment |
+| hosted runtime | Hosts `/embed/sdk/main`, `/embed/embed/sdk/field/*`, `/embed/embed/sdk/element/*` | `http://localhost:3000` or a real environment |
 | stub runtime (optional) | Fake hello endpoint (for PROTOCOL_UNSUPPORTED), started on demand | in `test-e2e/`, `:8099` |
 
 The harness provides a set of **empty containers with fixed ids** (mount slots)
@@ -268,7 +268,7 @@ pass through the harness hooks or the SDK**. Convention:
 
 ### 6.2 Stub runtime (for `PROTOCOL_UNSUPPORTED` only)
 
-- A minimal `/sdk/main` stand-in that, at handshake, replies with a
+- A minimal `/embed/sdk/main` stand-in that, at handshake, replies with a
   `RuntimeHello` whose `supportedMajorVersions` **excludes** the current
   `PROTOCOL_MAJOR` (set to a disjoint value).
 - Used only by `C1-03`. Touches no card data; not part of any published artifact.

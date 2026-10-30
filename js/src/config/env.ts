@@ -33,3 +33,30 @@ export function resolveHostOrigin(env: Env = 'prod', override?: string): string 
     }
     return HOST_ORIGINS[env];
 }
+
+/**
+ * Base path under which the hosted runtime serves its pages (`main`, `field/*`, `element/*`).
+ * Requires a hosted runtime that serves `/embed/sdk/*` (SDK >= 0.0.6).
+ */
+export const RUNTIME_BASE_PATH = '/embed/sdk';
+
+/**
+ * Build a hosted-runtime page URL (without a query string; callers append their own).
+ *
+ * @param hostOrigin - Hosted page origin; trailing slashes are stripped.
+ * @param segment - `'main'` (hidden main frame), `'field'` (split field) or `'element'`.
+ * @param type - Field/element type; required for `'field'` and `'element'`.
+ * @returns Absolute URL such as `https://host/embed/sdk/field/cardNumber`.
+ * @example
+ * runtimeUrl('https://checkout.sunbay.us', 'main');                 // '.../embed/sdk/main'
+ * runtimeUrl('https://checkout.sunbay.us/', 'field', 'cardNumber'); // '.../embed/sdk/field/cardNumber'
+ */
+export function runtimeUrl(
+    hostOrigin: string,
+    segment: 'main' | 'field' | 'element',
+    type?: string
+): string {
+    const origin = hostOrigin.replace(/\/+$/, '');
+    const path = type ? `${segment}/${type}` : segment;
+    return `${origin}${RUNTIME_BASE_PATH}/${path}`;
+}

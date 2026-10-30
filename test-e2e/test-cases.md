@@ -51,7 +51,7 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **steps** 1. `setup({ session:'auto', elements:[] })` 2. `instance.getSession()`
 - **expected**
   - `SetupResult.ok===true`, `instance` non-null, `checkoutId` present
-  - a hidden main iframe exists, src → `<hostOrigin>/sdk/main?checkoutId=...`, size 0×0
+  - a hidden main iframe exists, src → `<hostOrigin>/embed/sdk/main?checkoutId=...`, size 0×0
   - `getSession()` returns a `PublicSessionView` with `sessionId/currency/totalAmount/paymentMethods`
 - **assertions**
   - `ok===true` and `instance.checkoutId` is a non-empty string
@@ -107,17 +107,17 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **harness-config** `{ session:'auto', elements:[{ type:'card', slot:'#slot-card' }] }`
 - **steps** 1. `setup(...)` (auto-mount)
 - **expected**
-  - `#slot-card` has 1 visible iframe, src segment `/sdk/element/card`, query contains `checkoutId` and `elementId`
+  - `#slot-card` has 1 visible iframe, src segment `/embed/sdk/element/card`, query contains `checkoutId` and `elementId`
   - its `elementReady` received; `getStatus()==='ready'`
   - after a resize message, iframe height > 0
-- **assertions** slot iframe exists and src contains `/sdk/element/card`; `events` contains the matching `elementReady`; `getStatus()==='ready'`
+- **assertions** slot iframe exists and src contains `/embed/sdk/element/card`; `events` contains the matching `elementReady`; `getStatus()==='ready'`
 - **cleanup** `destroy()`
 
 ### C2-02 split three fields mount (cardNumber/cardExpiry/cardCvc)
 - **category** C2 · **priority** P0 · **real-device-condition** `none`
 - **harness-config** `{ session:'auto', elements:[{type:'cardNumber',slot:'#slot-num'},{type:'cardExpiry',slot:'#slot-exp'},{type:'cardCvc',slot:'#slot-cvc'}] }`
 - **steps** 1. `setup(...)`
-- **expected** three slots each have 1 iframe, src segments `/sdk/field/cardNumber|cardExpiry|cardCvc`; three `elementReady` with distinct elementIds, no cross-talk
+- **expected** three slots each have 1 iframe, src segments `/embed/sdk/field/cardNumber|cardExpiry|cardCvc`; three `elementReady` with distinct elementIds, no cross-talk
 - **assertions** three iframe srcs correct; `events` contains 3 `elementReady` each mapped to its slot; no cross-talk (exactly one per slot)
 - **cleanup** `destroy()`
 
@@ -125,7 +125,7 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **category** C2 · **priority** P1 · **real-device-condition** `none`
 - **harness-config** `{ session:'auto', elements:[{type:'address',slot:'#slot-bill',options:{mode:'billing'}},{type:'address',slot:'#slot-ship',options:{mode:'shipping'}}] }`
 - **steps** 1. `setup(...)`
-- **expected** two address iframes (src segment `/sdk/element/address`) ready; `mode` billing/shipping respectively
+- **expected** two address iframes (src segment `/embed/sdk/element/address`) ready; `mode` billing/shipping respectively
 - **assertions** two `elementReady`; `elements['#slot-bill'].mode==='billing'`, `elements['#slot-ship'].mode==='shipping'`
 - **cleanup** `destroy()`
 
@@ -134,7 +134,7 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **harness-config** `{ session:'auto', elements:[{type:'expressCheckout',slot:'#slot-express'}] }`
 - **steps** 1. `setup(...)`
 - **expected**
-  - express iframe (src segment `/sdk/element/expressCheckout`) ready
+  - express iframe (src segment `/embed/sdk/element/expressCheckout`) ready
   - `elementReady` carries `availableWallets`; `getAvailableWallets()` returns an object with `applePay`/`googlePay` booleans
   - in a plain browser both may be false (buttons not rendered) — **expected, not a failure**
 - **assertions** `elementReady` received; `getAvailableWallets()` is an object with two booleans; if `expressAvailabilityChange` arrives, the snapshot updates
@@ -178,7 +178,7 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 - **harness-config** `{ session:'auto', elements:[{type:'card',slot:'#slot-card'},{type:'expressCheckout',slot:'#slot-express'}] }`
 - **steps** 1. `setup(...)`
 - **expected** card and express each ready, no conflict
-- **assertions** two `elementReady`; card src `/sdk/element/card`, express src `/sdk/element/expressCheckout`; no `createError`
+- **assertions** two `elementReady`; card src `/embed/sdk/element/card`, express src `/embed/sdk/element/expressCheckout`; no `createError`
 - **cleanup** `destroy()`
 
 ### C3-03 combined card then split field -> ELEMENT_CONFLICT

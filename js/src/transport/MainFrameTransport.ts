@@ -2,7 +2,7 @@
  * MainFrameTransport — the transport layer between the merchant SDK and the hosted main iframe (spec 5).
  *
  * Responsibilities:
- * - Create a hidden, 0-size main iframe (`${hostOrigin}/sdk/main?checkoutId=...`).
+ * - Create a hidden, 0-size main iframe (`${hostOrigin}/embed/sdk/main?checkoutId=...`).
  * - Send request envelopes and pair responses by `requestId` (resolve/reject).
  * - Dispatch `kind:'event'` envelopes to handlers registered via `on`.
  * - Enforce the security boundary: only accept messages whose `event.origin === hostOrigin`,
@@ -29,6 +29,7 @@ import {
     type RuntimeHello,
 } from '@sunbay/checkout-sdk-protocol';
 import { ErrorCode } from '@sunbay/checkout-sdk-protocol';
+import { runtimeUrl } from '../config/env';
 import { isValidRuntimeHello } from './hello';
 
 /** Constructor parameters. */
@@ -147,7 +148,7 @@ export class MainFrameTransport {
             return this.iframe;
         }
         const iframe = document.createElement('iframe');
-        iframe.src = `${this.hostOrigin}/sdk/main?checkoutId=${this.checkoutId}`;
+        iframe.src = `${runtimeUrl(this.hostOrigin, 'main')}?checkoutId=${this.checkoutId}`;
         iframe.setAttribute('aria-hidden', 'true');
         iframe.title = 'sunbay-checkout-main';
         iframe.style.position = 'absolute';

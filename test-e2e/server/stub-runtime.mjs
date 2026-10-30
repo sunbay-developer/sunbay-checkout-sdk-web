@@ -2,7 +2,7 @@
 /**
  * Optional stub runtime — ONLY for case C1-03 (PROTOCOL_UNSUPPORTED).
  *
- * Serves a fake `/sdk/main` page that, once loaded, broadcasts a RuntimeHello whose
+ * Serves a fake `/embed/sdk/main` page (also the legacy `/sdk/main` alias) that, once loaded, broadcasts a RuntimeHello whose
  * `supportedMajorVersions` deliberately EXCLUDES the SDK's current PROTOCOL_MAJOR (1).
  * createCheckout then finds no common major version and rejects with PROTOCOL_UNSUPPORTED,
  * which is exactly what C1-03 verifies.
@@ -51,7 +51,7 @@ const server = createServer((req, res) => {
         res.end(JSON.stringify({ ok: true, stub: true }));
         return;
     }
-    if (path === '/sdk/main') {
+    if (path === '/embed/sdk/main' || path === '/sdk/main') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(FAKE_MAIN_HTML);
         return;
@@ -66,7 +66,7 @@ server.listen(PORT, () => {
         [
             '',
             '  Checkout SDK e2e STUB runtime started (PROTOCOL_UNSUPPORTED only)',
-            `  fake main: http://localhost:${PORT}/sdk/main (broadcasts incompatible hello)`,
+            `  fake main: http://localhost:${PORT}/embed/sdk/main (+ legacy /sdk/main; broadcasts incompatible hello)`,
             `  healthz:   http://localhost:${PORT}/healthz`,
             '',
         ].join('\n')

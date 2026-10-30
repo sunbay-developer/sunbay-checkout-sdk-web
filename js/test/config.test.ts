@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHostOrigin } from '../src/config/env';
+import { RUNTIME_BASE_PATH, resolveHostOrigin, runtimeUrl } from '../src/config/env';
 
 /**
  * Environment config contract tests (source of truth: js/src/config/env).
@@ -30,5 +30,29 @@ describe('resolveHostOrigin', () => {
         expect(resolveHostOrigin('dev', 'http://localhost:3000')).toBe(
             'http://localhost:3000'
         );
+    });
+});
+
+describe('runtimeUrl', () => {
+    const ORIGIN = 'https://checkout.sunbay.us';
+
+    it('exposes the runtime base path', () => {
+        expect(RUNTIME_BASE_PATH).toBe('/embed/sdk');
+    });
+
+    it('runtimeUrl builds /embed/sdk/main', () => {
+        expect(runtimeUrl(ORIGIN, 'main')).toBe(`${ORIGIN}/embed/sdk/main`);
+    });
+
+    it('runtimeUrl builds /embed/sdk/field/cardNumber', () => {
+        expect(runtimeUrl(ORIGIN, 'field', 'cardNumber')).toBe(`${ORIGIN}/embed/sdk/field/cardNumber`);
+    });
+
+    it('runtimeUrl builds /embed/sdk/element/<type>', () => {
+        expect(runtimeUrl(ORIGIN, 'element', 'card')).toBe(`${ORIGIN}/embed/sdk/element/card`);
+    });
+
+    it('runtimeUrl strips trailing slash from hostOrigin', () => {
+        expect(runtimeUrl(`${ORIGIN}//`, 'main')).toBe(`${ORIGIN}/embed/sdk/main`);
     });
 });

@@ -131,7 +131,7 @@ describe('CheckoutElement.mount', () => {
         const iframe = container.querySelector('iframe');
         expect(iframe).not.toBeNull();
         const src = iframe?.getAttribute('src') ?? '';
-        expect(src).toContain(`${HOST_ORIGIN}/sdk/field/cardNumber?`);
+        expect(src).toContain(`${HOST_ORIGIN}/embed/sdk/field/cardNumber?`);
         expect(src).toContain(`checkoutId=${CHECKOUT_ID}`);
         // createElement command already sent
         expect(transport.requests.some((r) => r.name === 'createElement')).toBe(true);
@@ -188,14 +188,14 @@ describe('CheckoutElement.mount', () => {
         expect(allow).toContain(`publickey-credentials-get 'self' ${HOST_ORIGIN}`);
     });
 
-    it('card/address/express use the /sdk/element/<type> path', async () => {
+    it('card/address/express use the /embed/sdk/element/<type> path', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'card', 'el_c');
         const container = makeContainer('t2');
         const mounted = el.mount(container);
         const iframe = container.querySelector('iframe');
         expect(iframe?.getAttribute('src') ?? '').toContain(
-            `${HOST_ORIGIN}/sdk/element/card?`
+            `${HOST_ORIGIN}/embed/sdk/element/card?`
         );
         transport.emit('elementReady', { elementId: 'el_c' });
         await mounted;
@@ -537,7 +537,7 @@ describe('CheckoutElement strict event matching', () => {
 });
 
 describe('CheckoutElement expressCheckout', () => {
-    it('mount inserts an iframe pointing to /sdk/element/expressCheckout', async () => {
+    it('mount inserts an iframe pointing to /embed/sdk/element/expressCheckout', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport, 'expressCheckout', 'el_express');
         const container = makeContainer('t-express');
@@ -545,7 +545,7 @@ describe('CheckoutElement expressCheckout', () => {
         const iframe = container.querySelector('iframe');
         expect(iframe).not.toBeNull();
         expect(iframe?.getAttribute('src') ?? '').toContain(
-            `${HOST_ORIGIN}/sdk/element/expressCheckout?`
+            `${HOST_ORIGIN}/embed/sdk/element/expressCheckout?`
         );
         transport.emit('elementReady', { elementId: 'el_express' });
         await expect(mounted).resolves.toBeUndefined();

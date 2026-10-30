@@ -67,6 +67,10 @@ checkout.on('paymentResult', (evt) => console.log(evt));
 const outcome = await checkout.confirm();
 ```
 
+## Compatibility
+
+Hosted runtime must serve `/embed/sdk/*` (SDK >= 0.0.6); deploy the runtime before upgrading the SDK.
+
 ## Public API
 
 | Export | Description |

@@ -30,6 +30,7 @@ import {
     type ExpressAvailabilityChangeEvent,
     type ExpressCheckoutElementOptions,
 } from '@sunbay/checkout-sdk-protocol';
+import { runtimeUrl } from './config/env';
 
 /**
  * The minimal interface the transport depends on (satisfied by MainFrameTransport).
@@ -120,7 +121,7 @@ interface ElementReadyPayload extends WithElementId {
     availableWallets?: AvailableWallets;
 }
 
-/** The split field types (routed to /sdk/field/<type>). */
+/** The split field types (routed to /embed/sdk/field/<type>). */
 const FIELD_TYPES: readonly ElementType[] = ['cardNumber', 'cardExpiry', 'cardCvc'];
 
 /** The input classes that provide focus/blur/clear (expressCheckout excluded). */
@@ -643,7 +644,7 @@ export class CheckoutElement {
     }
 
     /**
-     * Resolve the iframe src: split fields go to /sdk/field/, the rest to /sdk/element/, with
+     * Resolve the iframe src: split fields go to /embed/sdk/field/, the rest to /embed/sdk/element/, with
      * checkoutId and elementId; if an initial colorScheme is provided, append `&colorScheme=<value>`
      * (no flash on the first frame); if the initial appearance contains variables or rules, append
      * `&appearance=<encodeURIComponent(JSON.stringify(appearance))>` (takes effect on the first
@@ -685,7 +686,7 @@ export class CheckoutElement {
         if (this.type === 'expressCheckout') {
             query += this.resolveExpressQuery();
         }
-        return `${this.hostOrigin}/sdk/${segment}/${this.type}${query}`;
+        return `${runtimeUrl(this.hostOrigin, segment, this.type)}${query}`;
     }
 
     /**

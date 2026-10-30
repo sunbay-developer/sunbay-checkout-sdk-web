@@ -22,15 +22,15 @@ test('C1-01 createCheckout handshake + initialize succeeds @p0 @c1', async ({ pa
     expect(result.ok, result.error?.message).toBe(true);
     expect(result.checkoutId).toBeTruthy();
 
-    // Hidden 0x0 main iframe pointing at /sdk/main.
+    // Hidden 0x0 main iframe pointing at /embed/sdk/main.
     const mainInfo = await page.evaluate((hosted) => {
         const iframes = Array.from(document.querySelectorAll('iframe'));
-        const main = iframes.find((f) => f.src.includes('/sdk/main'));
+        const main = iframes.find((f) => f.src.includes('/embed/sdk/main'));
         if (!main) return null;
         return { w: main.offsetWidth, h: main.offsetHeight, src: main.src, hosted };
     }, HOSTED_ORIGIN);
     expect(mainInfo, 'main iframe exists').not.toBeNull();
-    expect(mainInfo!.src).toContain('/sdk/main');
+    expect(mainInfo!.src).toContain('/embed/sdk/main');
     expect(mainInfo!.w).toBe(0);
     expect(mainInfo!.h).toBe(0);
 
@@ -62,7 +62,7 @@ test('C1-03 protocol major mismatch -> PROTOCOL_UNSUPPORTED @p1 @c1 @optional', 
     expect(result.error?.code).toBe('PROTOCOL_UNSUPPORTED');
     // No lingering main iframe.
     const mains = await page.evaluate(
-        () => Array.from(document.querySelectorAll('iframe')).filter((f) => f.src.includes('/sdk/main')).length
+        () => Array.from(document.querySelectorAll('iframe')).filter((f) => f.src.includes('/embed/sdk/main')).length
     );
     expect(mains).toBe(0);
 });

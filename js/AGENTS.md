@@ -26,7 +26,7 @@ before starting.
 - `Element.ts` — the `CheckoutElement` handle (card / cardField / address /
   expressCheckout, etc.).
 - `transport/MainFrameTransport.ts` — transport layer: creates the hidden,
-  zero-size main iframe (`${hostOrigin}/sdk/main?checkoutId=...`), pairs
+  zero-size main iframe (`${hostOrigin}/embed/sdk/main?checkoutId=...`), pairs
   request/response by `requestId`, dispatches event envelopes; **security
   filter** accepts only messages where `event.origin === hostOrigin` and the
   `checkoutId` matches.

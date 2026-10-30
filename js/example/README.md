@@ -49,8 +49,8 @@ example/
    pnpm --filter @sunbay/checkout-sdk-js run build
    ```
 
-2. **Run the hosted runtime** the SDK talks to (serves `/sdk/main`,
-   `/sdk/field/*`, `/sdk/element/*`). Locally this is the `checkout` repo's dev
+2. **Run the hosted runtime** the SDK talks to (serves `/embed/sdk/main`,
+   `/embed/embed/sdk/field/*`, `/embed/embed/sdk/element/*`). Locally this is the `checkout` repo's dev
    server on `:3000`:
 
    ```bash
