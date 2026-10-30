@@ -219,7 +219,7 @@ export class CheckoutInstance {
      * Initiate a payment confirmation. Generates an operationId, sends the `confirm` command, and
      * returns a Promise fulfilled by `paymentResult` events with the same operationId.
      *
-     * Behavior changes in 0.0.6: previously the Promise resolved on the first `paymentResult`,
+     * Behavior changes in 0.0.7: previously the Promise resolved on the first `paymentResult`,
      * including a non-final `pending` outcome. Now it resolves ONLY on a terminal outcome
      * (`succeeded` | `failed` | `canceled`); a `pending` outcome keeps it waiting.
      *

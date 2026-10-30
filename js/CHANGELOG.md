@@ -4,7 +4,12 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The SDK and
 `@sunbay/checkout-sdk-protocol` share the same version number.
 
-## [0.0.6] - Unreleased
+## [0.0.7] - 2026-10-30
+
+> There is no `@sunbay/checkout-sdk-js@0.0.6`. A `0.0.6` release was started, but the release
+> script aborted after publishing `@sunbay/checkout-sdk-protocol@0.0.6` and before publishing the js
+> package. To keep the two packages in lockstep, the changes below ship as `0.0.7` for both.
+> Do not use protocol `0.0.6`.
 
 ### Changed
 

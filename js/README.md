@@ -43,7 +43,7 @@ const outcome = await checkout.confirm();
 | `appearance` | `{ variables, rules, colorScheme }` (whitelisted design variables, no arbitrary CSS). |
 | `paymentMethods` | `{ hide?: string[]; order?: string[] }` - subtract/sort only. |
 
-The hosted runtime must serve `/embed/sdk/*` (SDK >= 0.0.6). Deploy the runtime before upgrading the SDK.
+The hosted runtime must serve `/embed/sdk/*` (SDK >= 0.0.7). Deploy the runtime before upgrading the SDK.
 
 ## Elements
 
@@ -177,7 +177,7 @@ challenges: it only emits the event. Your page must handle the action.
   `INSTANCE_DESTROYED`. Calling `destroy()` while a `confirm()` is pending rejects that
   `confirm()` with `INSTANCE_DESTROYED`.
 
-## Behavior changes in 0.0.6
+## Behavior changes in 0.0.7
 
 - `confirm()` resolves only terminal outcomes or the watchdog `pending` (see above); the
   slot is held until terminal or `destroy()`.

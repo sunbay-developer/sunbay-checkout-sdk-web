@@ -36,7 +36,7 @@ export function resolveHostOrigin(env: Env = 'prod', override?: string): string 
 
 /**
  * Base path under which the hosted runtime serves its pages (`main`, `field/*`, `element/*`).
- * Requires a hosted runtime that serves `/embed/sdk/*` (SDK >= 0.0.6).
+ * Requires a hosted runtime that serves `/embed/sdk/*` (SDK >= 0.0.7).
  */
 export const RUNTIME_BASE_PATH = '/embed/sdk';
 
