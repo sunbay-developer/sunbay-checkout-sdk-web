@@ -8,6 +8,10 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ### Changed
 
+- **Breaking:** `createCheckout()` now requires `checkoutClientSecret` (returned by the backend's
+  `create-session` when `sessionType` is `embedded`). A missing, blank or non-string value rejects
+  with `INVALID_OPTIONS` before any iframe is created. Existing sessions must be re-created with
+  `sessionType: embedded`. The protocol field `InitializeReq.checkoutClientSecret` is optional.
 - `confirm()` now resolves only on a terminal outcome (`succeeded` | `failed` | `canceled`).
   A `pending` outcome keeps the Promise waiting. After the watchdog (default 120000 ms,
   `resultTimeoutMs`) it resolves `{ status: 'pending', operationId }`, which is not a failure:

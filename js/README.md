@@ -14,13 +14,14 @@ The protocol types (`@sunbay/checkout-sdk-protocol`) come in transitively.
 
 ## Quick start
 
-Create the checkout session **server-side** (your backend holds the API key) and pass
-only the `sessionId` to the browser.
+Create the checkout session **server-side** (your backend holds the API key, and creates the
+session with `sessionType: 'embedded'`) and pass the `sessionId` and the returned
+`checkoutClientSecret` to the browser.
 
 ```ts
 import { createCheckout } from '@sunbay/checkout-sdk-js';
 
-const checkout = await createCheckout({ sessionId, env: 'test' });
+const checkout = await createCheckout({ sessionId, checkoutClientSecret, env: 'test' });
 
 await checkout.create('cardNumber').mount('#card-number');
 await checkout.create('cardExpiry').mount('#card-expiry');
@@ -35,6 +36,7 @@ const outcome = await checkout.confirm();
 | Option | Description |
 | --- | --- |
 | `sessionId` | Required. Server-created session id. |
+| `checkoutClientSecret` | Required. Returned by your backend's `create-session` when `sessionType` is `'embedded'`. Pass it to the browser over an authenticated HTTPS response only; never put it in a URL or write it to logs. A missing, blank or non-string value rejects with `INVALID_OPTIONS`. |
 | `env` | `'dev' \| 'test' \| 'prod'` (default `'prod'`). Selects the hosted origin. |
 | `hostOrigin` | Overrides the hosted origin (takes precedence over `env`), e.g. `http://localhost:3000`. |
 | `locale` | UI locale, e.g. `'en-US'`, `'zh-CN'`. |

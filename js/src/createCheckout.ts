@@ -46,6 +46,12 @@ export type TransportFactory = (args: {
 export interface CreateCheckoutOptions {
     /** Checkout session id created by the backend (required). */
     sessionId: string;
+    /**
+     * Client secret of the session (required). Returned by the merchant backend's `create-session`
+     * call when `sessionType` is `embedded`. Hand it to the browser over an authenticated HTTPS
+     * response; never put it in a URL or write it to logs.
+     */
+    checkoutClientSecret: string;
     /** Runtime environment (dev/test/prod), defaults to prod. */
     env?: Env;
     /** Override the hosted origin (takes precedence over env). */
@@ -85,12 +91,21 @@ const defaultTransportFactory: TransportFactory = ({ checkoutId, hostOrigin }) =
  *
  * @param opts - Checkout parameters.
  * @returns A ready CheckoutInstance.
- * @throws reject RUNTIME_LOAD_FAILED (handshake timeout) / PROTOCOL_UNSUPPORTED (no common major
+ * @throws reject INVALID_OPTIONS (missing/blank/non-string checkoutClientSecret, before any iframe
+ *         is created) / RUNTIME_LOAD_FAILED (handshake timeout) / PROTOCOL_UNSUPPORTED (no common major
  *         version) / or the initialize business error.
  * @example
- * const checkout = await createCheckout({ sessionId: 'sess_x', env: 'prod' });
+ * const checkout = await createCheckout({
+ *     sessionId: 'sess_x',
+ *     checkoutClientSecret: 'ccs_x', // from your backend's create-session (sessionType: embedded)
+ *     env: 'prod',
+ * });
  */
 export async function createCheckout(opts: CreateCheckoutOptions): Promise<CheckoutInstance> {
+    // Validate first so a rejected call creates no iframe. Never echo the supplied value.
+    if (typeof opts.checkoutClientSecret !== 'string' || opts.checkoutClientSecret.trim() === '') {
+        throw makeError(ErrorCode.INVALID_OPTIONS, 'checkoutClientSecret is required');
+    }
     const checkoutId = genId('co');
     const hostOrigin = resolveHostOrigin(opts.env, opts.hostOrigin);
     const factory = opts.__transportFactory ?? defaultTransportFactory;
@@ -124,6 +139,7 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
     // Send initialize.
     const initReq: InitializeReq = {
         sessionId: opts.sessionId,
+        checkoutClientSecret: opts.checkoutClientSecret,
         locale: opts.locale,
         appearance: opts.appearance,
         paymentMethods: opts.paymentMethods,

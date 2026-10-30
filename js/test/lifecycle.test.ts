@@ -648,6 +648,7 @@ describe('createCheckout hello validation', () => {
         };
         const promise = createCheckout({
             sessionId: 's',
+            checkoutClientSecret: 'ccs_test',
             hostOrigin: HOST_ORIGIN,
             __transportFactory: () => transport,
         });

@@ -59,6 +59,12 @@ export interface InitializeReq {
     locale?: string;
     appearance?: Appearance;
     paymentMethods?: PaymentMethodFilter;
+    /**
+     * Sensitive per-session secret (optional at the protocol level; the JS SDK enforces it).
+     * Returned by the merchant backend's
+     * `create-session` call when `sessionType` is `embedded`. Never log it or put it in a URL.
+     */
+    checkoutClientSecret?: string;
 }
 export interface InitializeResp {
     capabilities: string[];

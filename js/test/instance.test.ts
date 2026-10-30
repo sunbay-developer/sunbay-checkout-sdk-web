@@ -139,6 +139,7 @@ async function bootstrap(
     overrides?.(transport);
     const promise = createCheckout({
         sessionId: 'sess_1',
+        checkoutClientSecret: 'ccs_test',
         hostOrigin: HOST_ORIGIN,
         appearance: createOpts?.appearance,
         __transportFactory: () => transport,
@@ -173,6 +174,7 @@ describe('createCheckout', () => {
         const transport = createMockTransport();
         const promise = createCheckout({
             sessionId: 'sess_1',
+            checkoutClientSecret: 'ccs_test',
             hostOrigin: HOST_ORIGIN,
             __transportFactory: () => transport,
         });
@@ -188,6 +190,7 @@ describe('createCheckout', () => {
         const transport = createMockTransport();
         const promise = createCheckout({
             sessionId: 'sess_1',
+            checkoutClientSecret: 'ccs_test',
             hostOrigin: HOST_ORIGIN,
             __transportFactory: () => transport,
         });
@@ -196,6 +199,51 @@ describe('createCheckout', () => {
         await expect(promise).rejects.toMatchObject({
             code: ErrorCode.PROTOCOL_UNSUPPORTED,
         });
+    });
+});
+
+describe('createCheckout checkoutClientSecret', () => {
+    it('rejects INVALID_OPTIONS for a missing, blank or non-string checkoutClientSecret', async () => {
+        for (const bad of [undefined, '', '   ', null, 123]) {
+            const factory = vi.fn(() => createMockTransport());
+            await expect(
+                createCheckout({
+                    sessionId: 'sess_1',
+                    checkoutClientSecret: bad as unknown as string,
+                    hostOrigin: HOST_ORIGIN,
+                    __transportFactory: factory,
+                })
+            ).rejects.toMatchObject({
+                code: ErrorCode.INVALID_OPTIONS,
+                message: 'checkoutClientSecret is required',
+            });
+            // No iframe/transport is created for a rejected call.
+            expect(factory).not.toHaveBeenCalled();
+        }
+    });
+
+    it('sends checkoutClientSecret in the initialize payload', async () => {
+        const { transport } = await bootstrap();
+        const init = transport.requests.find((r) => r.name === 'initialize');
+        expect(init?.payload).toMatchObject({
+            sessionId: 'sess_1',
+            checkoutClientSecret: 'ccs_test',
+        });
+    });
+
+    it('does not keep the secret on the instance', async () => {
+        const { instance } = await bootstrap();
+        const rest = Object.entries(instance).filter(([key]) => key !== 'transport');
+        expect(JSON.stringify(rest)).not.toContain('ccs_test');
+    });
+
+    it('requires checkoutClientSecret at the type level', () => {
+        // Never invoked: only checked by `pnpm type-check`.
+        const neverCalled = (): void => {
+            // @ts-expect-error checkoutClientSecret is required
+            void createCheckout({ sessionId: 'x' });
+        };
+        expect(typeof neverCalled).toBe('function');
     });
 });
 
