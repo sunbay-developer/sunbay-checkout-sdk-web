@@ -6,6 +6,11 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [0.0.6] - Unreleased
 
+### Added
+
+- `CheckoutInstance.session`: synchronous, read-only snapshot of the session returned by
+  initialization (`PublicSessionView`). It is kept up to date by `getSession()` / `refresh()`.
+
 ### Changed
 
 - `confirm()` now resolves only on a terminal outcome (`succeeded` | `failed` | `canceled`).

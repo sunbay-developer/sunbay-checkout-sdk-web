@@ -145,7 +145,7 @@ export class CheckoutInstance {
 
     private readonly hostOrigin: string;
     private readonly transport: InstanceTransport;
-    private session: PublicSessionView;
+    private sessionView: PublicSessionView;
     /** Initial appearance customization (passed through to each created Element's iframe src). */
     private readonly appearance: Appearance | undefined;
 
@@ -172,7 +172,7 @@ export class CheckoutInstance {
         this.capabilities = opts.capabilities;
         this.hostOrigin = opts.hostOrigin;
         this.transport = opts.transport;
-        this.session = opts.session;
+        this.sessionView = opts.session;
         this.appearance = opts.appearance;
 
         this.paymentResultHandler = (payload: unknown): void => {
@@ -333,6 +333,17 @@ export class CheckoutInstance {
     }
 
     /**
+     * The latest session snapshot, available synchronously right after `createCheckout()` resolves.
+     *
+     * It starts as the view returned by `initialize` and is replaced whenever `getSession()` or
+     * `refresh()` succeeds. It is a local snapshot: call `refresh()` to re-fetch from the backend.
+     * Readable after `destroy()` (it returns the last known snapshot).
+     */
+    get session(): PublicSessionView {
+        return this.sessionView;
+    }
+
+    /**
      * Get the latest session view (passes through the getSession command and writes back the local snapshot).
      *
      * @returns The latest PublicSessionView.
@@ -341,7 +352,7 @@ export class CheckoutInstance {
     async getSession(): Promise<PublicSessionView> {
         this.assertAlive();
         const resp = (await this.transport.request('getSession', {})) as PublicSessionView;
-        this.session = resp;
+        this.sessionView = resp;
         return resp;
     }
 
@@ -354,7 +365,7 @@ export class CheckoutInstance {
     async refresh(): Promise<PublicSessionView> {
         this.assertAlive();
         const resp = (await this.transport.request('refresh', {})) as PublicSessionView;
-        this.session = resp;
+        this.sessionView = resp;
         return resp;
     }
 
