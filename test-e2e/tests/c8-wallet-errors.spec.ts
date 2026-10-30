@@ -12,9 +12,12 @@
  *   - validationFail : fires onvalidatemerchant with a bogus validationURL, so the
  *                      sandbox backend rejects merchant validation.
  *   - cancel         : fires oncancel (user dismissed the sheet).
- *   - authorizeFail : fires onpaymentauthorized with a fake token and makes
- *                      completePayment() throw, so the failure truly originates in the
- *                      authorization stage (applePayClient: stage 'authorization').
+ *   - authorizeFail : fires onpaymentauthorized with a payment whose token has NO
+ *                      `paymentData`, so the hosted payload transform throws AFTER Apple
+ *                      authorization but BEFORE anything is submitted (stage
+ *                      'authorization'). The hosted runtime defers completePayment, so it
+ *                      must then complete the sheet as STATUS_FAILURE; the stub records
+ *                      every completePayment status in `window.__applePayCompleted`.
  *
  * How to run (needs sandbox credentials in test-e2e/.env.local and the hosted runtime
  * running, see ../RUNNING.md). The specs are skipped without credentials, or when the
@@ -58,10 +61,9 @@ async function installApplePayStub(context: BrowserContext, scenario: Scenario, 
                 oncancel: (() => void) | null = null;
 
                 completeMerchantValidation(): void {}
-                completePayment(): void {
-                    if (scenarioName === 'authorizeFail') {
-                        throw new Error('stub completePayment failure');
-                    }
+                completePayment(status: number): void {
+                    const log = ((w.__applePayCompleted as number[] | undefined) ??= []);
+                    log.push(status);
                 }
                 abort(): void {}
 
@@ -70,8 +72,9 @@ async function installApplePayStub(context: BrowserContext, scenario: Scenario, 
                         if (scenarioName === 'cancel') {
                             this.oncancel?.();
                         } else if (scenarioName === 'authorizeFail') {
+                            // Malformed on purpose: no token.paymentData -> transform throws.
                             this.onpaymentauthorized?.({
-                                payment: { token: { paymentData: { data: tokenValue } } },
+                                payment: { token: { transactionIdentifier: tokenValue } },
                             });
                         } else {
                             this.onvalidatemerchant?.({
@@ -123,6 +126,18 @@ async function clickApplePay(page: Page): Promise<void> {
 
 function opEvents(events: HarnessEvent[], name: string): OperationPayload[] {
     return events.filter((e) => e.name === name).map((e) => e.payload as OperationPayload);
+}
+
+/** Collect `completePayment` statuses recorded by the stub across all frames. */
+async function applePayCompletions(page: Page): Promise<number[]> {
+    const all: number[] = [];
+    for (const frame of page.frames()) {
+        const log = await frame
+            .evaluate(() => (window as unknown as { __applePayCompleted?: number[] }).__applePayCompleted ?? [])
+            .catch(() => [] as number[]);
+        all.push(...log);
+    }
+    return all;
 }
 
 async function assertNoToken(page: Page): Promise<void> {
@@ -184,7 +199,7 @@ test('C8-02 user cancel -> canceled paymentResult and no error @p1 @c8', async (
     await assertNoToken(page);
 });
 
-test('C8-03 authorization failure -> authorization error + failed paymentResult, no token leak (PCI) @p1 @c8', async ({
+test('C8-03 failure after authorization, before submit -> authorization error + failed paymentResult + STATUS_FAILURE @p1 @c8', async ({
     page,
     context,
 }) => {
@@ -205,6 +220,9 @@ test('C8-03 authorization failure -> authorization error + failed paymentResult,
     expect(failed, `failed paymentResult: ${JSON.stringify(results)}`).toBeTruthy();
     expect(failed!.operationId).toBeTruthy();
     expect(failed!.operationId).toBe(err!.operationId);
+
+    // The deferred completePayment must have been called exactly once with STATUS_FAILURE (1).
+    await expect.poll(async () => applePayCompletions(page), { timeout: 10_000 }).toEqual([1]);
 
     await assertNoToken(page);
 });

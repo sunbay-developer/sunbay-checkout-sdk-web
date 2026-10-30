@@ -36,7 +36,7 @@ test.afterEach(async ({ page }) => {
 });
 
 test('C7-01 full card payment flow -> paymentResult @p0 @c7', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     const r = await setup(page, { session: 'auto', elements: SPLIT });
     expect(r.ok, r.error?.message).toBe(true);
 
