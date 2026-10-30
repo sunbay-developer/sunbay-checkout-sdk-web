@@ -103,7 +103,7 @@ export interface ErrorEvent {
     operationId?: string;
     /** Payment method the error relates to, if any. */
     method?: PaymentMethod;
-    /** Wallet flow stage in which the error occurred, if applicable. */
+    /** Payment flow stage in which the error occurred, if applicable (wallet and card flows). */
     stage?: WalletErrorStage;
     error: CheckoutError;
 }

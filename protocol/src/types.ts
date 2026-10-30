@@ -95,7 +95,9 @@ export type CheckoutErrorCategory =
     | 'payment';
 
 /**
- * Stage of the wallet (express checkout) flow in which an error occurred.
+ * Stage of the payment flow in which an error occurred.
+ *
+ * `availability` is reserved and not emitted yet.
  */
 export type WalletErrorStage =
     | 'availability'

@@ -97,8 +97,18 @@ registration. Handler exceptions are isolated and rethrown asynchronously (they 
 ### Express wallets
 
 A wallet button click has no Promise. Listen for **both** `paymentResult` and `error`
-on the instance. Wallet failures emit both, sharing `operationId` and `error.errorId`;
-de-duplicate by `operationId`.
+on the instance. What is emitted depends on where the failure happens:
+
+- Pre-submit wallet failures (merchant validation, authorization, runtime) emit **both**
+  `error` and a failed `paymentResult`, sharing `operationId` and `error.errorId`;
+  de-duplicate by `operationId`.
+- Definitive backend rejections after submit emit only `paymentResult(failed)`, with
+  `backendCode` / `traceId` in `outcome.error`.
+- Unknown states (5xx / network) emit `paymentResult(pending)` plus
+  `error { paymentStateKnown: false }`.
+- A second authorization while another payment is in flight emits only `error`
+  (`CHECKOUT_BUSY`) and no failed `paymentResult`.
+
 
 ```ts
 const seen = new Set<string>();
@@ -131,8 +141,22 @@ while the SDK reports `pending`. Show your own "processing, do not pay again" UI
 | `paymentStateKnown` | `false`: outcome unknown, reconcile before any retry. |
 
 The `error` event also carries `method` (`'card' \| 'applePay' \| 'googlePay'`) and
-`stage` (`WalletErrorStage`): `availability`, `merchantValidation`, `authorization`,
-`submit`, `poll`, `runtime`.
+`stage` (`WalletErrorStage`): `merchantValidation`, `authorization`, `submit`, `poll`,
+`runtime`. `availability` is reserved and not emitted yet. `stage` may also be set for
+card confirms (`submit` / `poll`).
+
+### Runtime behavior changes (apply to all SDK versions once the hosted runtime is deployed)
+
+- The submit lock stays held after an unknown payment state (5xx / network) until a terminal
+  result, so a retry gets `CHECKOUT_BUSY`. Reconcile with `getPaymentStatus()` and wait.
+- Pre-submit wallet failures emit **both** `error` and a failed `paymentResult` with the same
+  `operationId` / `errorId`; de-duplicate by `operationId`.
+- The Apple Pay sheet closes as completed when the final state is unknown (the SDK reports
+  `pending`). Show a "processing, do not pay again" UI.
+- Polling continues past the 120 s diagnostic deadline.
+- If you allowlist hosted **paths** (WAF / CSP `frame-src`) rather than the origin, allow
+  `/embed/sdk/*`. A block shows up as a 15 s `RUNTIME_LOAD_FAILED`. Legacy `/sdk/*` is still
+  served for SDK <= 0.0.5.
 
 ### Redirect / 3DS
 
