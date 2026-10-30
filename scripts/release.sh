@@ -16,9 +16,13 @@
 #      脚本绝不打印 token、不写盘持久化 .npmrc。
 #
 # 用法：
-#   SUNBAY_NPM_TOKEN=... bash scripts/release.sh <version> [--dry-run]
+#   SUNBAY_NPM_TOKEN=... bash scripts/release.sh <version> [--dry-run] [--tag <name>]
+#   （--dry-run 与 --tag <name> 可在 version 之后以任意顺序出现）
 #   例：bash scripts/release.sh 0.0.3
 #       bash scripts/release.sh 0.0.3 --dry-run   # 只 build+pack 校验，不实发
+#       bash scripts/release.sh 0.0.3 --tag next  # 发布到 dist-tag next（默认 latest）
+#   --tag：仅在显式传入时才给 npm publish 追加 --tag；不传则行为不变（latest）。
+#         建议先 --tag next 发布，待托管运行时上线后再用 npm dist-tag add 提升为 latest。
 #
 set -euo pipefail
 
@@ -26,24 +30,58 @@ REGISTRY="https://registry.npmjs.org"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+USAGE="用法: bash scripts/release.sh <version> [--dry-run] [--tag <name>]"
 VERSION="${1:-}"
 DRY_RUN=false
-[[ "${2:-}" == "--dry-run" ]] && DRY_RUN=true
+TAG=""
+if [[ $# -gt 0 ]]; then shift; fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --tag)
+            if [[ $# -lt 2 ]]; then
+                echo "错误: --tag 需要一个参数" >&2
+                echo "$USAGE" >&2
+                exit 1
+            fi
+            TAG="$2"
+            shift 2
+            ;;
+        *)
+            echo "错误: 未知参数 '$1'" >&2
+            echo "$USAGE" >&2
+            exit 1
+            ;;
+    esac
+done
 
 if [[ -z "$VERSION" ]]; then
-    echo "用法: bash scripts/release.sh <version> [--dry-run]" >&2
+    echo "$USAGE" >&2
     exit 1
 fi
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
     echo "错误: 版本号 '$VERSION' 不是合法 semver" >&2
     exit 1
 fi
+if [[ -n "$TAG" ]]; then
+    if ! [[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        echo "错误: dist-tag '$TAG' 不合法（仅允许字母数字及 . _ -，且以字母数字开头）" >&2
+        exit 1
+    fi
+    if [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$ ]]; then
+        echo "错误: dist-tag '$TAG' 形似 semver 版本号，npm 不允许" >&2
+        exit 1
+    fi
+fi
 if [[ "$DRY_RUN" == false && -z "${SUNBAY_NPM_TOKEN:-}" ]]; then
     echo "错误: 未设置 SUNBAY_NPM_TOKEN（发布需要）。dry-run 可免。" >&2
     exit 1
 fi
 
-echo "==> 目标版本（lockstep）: $VERSION  ${DRY_RUN:+（dry-run）}"
+echo "==> 目标版本（lockstep）: $VERSION  ${DRY_RUN:+（dry-run）}${TAG:+  dist-tag: $TAG}"
 
 # 1) 两包版本号升到目标版本（lockstep）
 for pkg in protocol js; do
@@ -77,14 +115,18 @@ publish_pkg() {
         echo "错误: $name tarball 仍含未替换的 workspace: 依赖" >&2
         rm -f "$tgz"; popd >/dev/null; exit 1
     fi
+    # 仅在显式传入 --tag 时追加（默认 latest，行为不变）
+    local tag_args=()
+    [[ -n "$TAG" ]] && tag_args=(--tag "$TAG")
     if [[ "$DRY_RUN" == true ]]; then
         echo "    [dry-run] 跳过 npm publish $name@$VERSION"
+        echo "    [dry-run] 将执行: npm publish \"$tgz\" --registry \"$REGISTRY\" --//registry.npmjs.org/:_authToken=<redacted> --access public${TAG:+ --tag \"$TAG\"}"
     else
         npm publish "$tgz" \
             --registry "$REGISTRY" \
             --//registry.npmjs.org/:_authToken="$SUNBAY_NPM_TOKEN" \
-            --access public >/dev/null
-        echo "    + 已发布 $name@$VERSION"
+            --access public ${tag_args[@]+"${tag_args[@]}"} >/dev/null
+        echo "    + 已发布 $name@$VERSION${TAG:+（dist-tag: $TAG）}"
     fi
     rm -f "$tgz"
     popd >/dev/null

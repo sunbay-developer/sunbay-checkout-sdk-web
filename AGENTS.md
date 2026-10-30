@@ -124,6 +124,12 @@ pnpm --filter @sunbay/checkout-sdk-js run build
   Dry-run: `pnpm release <version> --dry-run` (build + pack validation only, no
   actual publish; it temporarily edits the package.json versions, then restore
   them afterward with `git checkout protocol/package.json js/package.json`).
+  Optional `--tag <name>` (any order with `--dry-run`, after the version) passes
+  `--tag <name>` to `npm publish`; omitted = default `latest`. Recommended
+  two-step rollout: publish with `--tag next`, then after the hosted runtime is
+  deployed promote with `npm dist-tag add <pkg>@<version> latest --registry
+  https://registry.npmjs.org` (for both packages). Dry-run prints the exact
+  token-less publish command.
   Manual follow-up after release: git commit the version changes in both packages
   and push; in the `checkout` repo bump the dependency to `^<version>` +
   `npm install` to lock the lockfile.
