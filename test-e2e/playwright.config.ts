@@ -7,6 +7,8 @@ import { defineConfig, devices } from '@playwright/test';
  * - E2E_HARNESS_ORIGIN  Test harness + backend origin (default http://localhost:8090)
  * - E2E_HOSTED_ORIGIN   Hosted runtime origin (default http://localhost:3000)
  * - E2E_STUB_ORIGIN     Optional stub runtime origin for PROTOCOL_UNSUPPORTED (default http://localhost:8099)
+ * - E2E_WEBKIT         '1' adds a `webkit` project next to chromium (default: chromium only).
+ *                        Requires `npx playwright install webkit`.
  * - E2E_HAVE_CREDENTIALS 'true' when server/.env.local has sandbox merchant credentials;
  *                        when unset/false, session-dependent tests are skipped (see support/env.ts).
  *
@@ -49,6 +51,14 @@ export default defineConfig({
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
         },
+        ...(process.env.E2E_WEBKIT === '1'
+            ? [
+                  {
+                      name: 'webkit',
+                      use: { ...devices['Desktop Safari'] },
+                  },
+              ]
+            : []),
     ],
     // Auto-start the test backend (serves harness.html + SDK dist + /api/create-session).
     // Reuses an already-running instance locally.

@@ -104,6 +104,10 @@ cross-origin postMessage, `event.origin` checks, and cross-iframe channels:
    (git-ignored); the browser never sees them.
 4. **Sandbox test cards** for functional tests: see `fixtures/test-cards.ts`
    (public test data, plaintext).
+5. **Optional WebKit project**: set `E2E_WEBKIT=1` to add a `webkit` project next to
+   `chromium` (default runs stay chromium-only). Install the browser once with
+   `npx playwright install webkit`, then run e.g.
+   `E2E_WEBKIT=1 npx playwright test --project=webkit`.
 
 ---
 
