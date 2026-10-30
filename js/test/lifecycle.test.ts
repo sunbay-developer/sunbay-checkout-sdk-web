@@ -347,6 +347,51 @@ describe('CheckoutElement.mount lifecycle', () => {
         expect(el.getStatus()).toBe('loadError');
     });
 
+    it('mount timeout sends destroyElement and a retry mount issues a new createElement', async () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport);
+        const box = track(el.mount(makeContainer()));
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(box.state).toBe('rejected');
+        expect(transport.requests.map((r) => r.name)).toEqual(['createElement', 'destroyElement']);
+        expect(transport.requests[1].payload).toEqual({ elementId: 'el_1' });
+
+        const retry = el.mount(makeContainer());
+        await vi.advanceTimersByTimeAsync(0);
+        expect(transport.requests.map((r) => r.name)).toEqual([
+            'createElement',
+            'destroyElement',
+            'createElement',
+        ]);
+        transport.emit('elementReady', { elementId: 'el_1' });
+        await retry;
+        expect(el.getStatus()).toBe('ready');
+    });
+
+    it('no destroyElement when createElement itself failed', async () => {
+        const transport = createMockTransport();
+        transport.requestImpl = () => Promise.reject({ code: ErrorCode.ELEMENT_CONFLICT });
+        const el = makeElement(transport);
+        const box = track(el.mount(makeContainer()));
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(box.state).toBe('rejected');
+        expect(transport.requests.map((r) => r.name)).toEqual(['createElement']);
+    });
+
+    it('runtime loadError after a successful createElement sends destroyElement', async () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport);
+        const box = track(el.mount(makeContainer()));
+        await vi.advanceTimersByTimeAsync(0);
+        transport.emit('loadError', {
+            elementId: 'el_1',
+            error: { code: ErrorCode.RUNTIME_LOAD_FAILED, message: 'x' },
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(box.state).toBe('rejected');
+        expect(transport.requests.map((r) => r.name)).toEqual(['createElement', 'destroyElement']);
+    });
+
     it('mount honors a custom timeoutMs', async () => {
         const transport = createMockTransport();
         const el = makeElement(transport);

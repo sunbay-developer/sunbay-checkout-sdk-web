@@ -331,6 +331,8 @@ export class CheckoutElement {
 
         return new Promise<void>((resolve, reject) => {
             let settled = false;
+            // True once the createElement request resolved (the hosted side has registered the element).
+            let registered = false;
             let timer: ReturnType<typeof setTimeout> | null = null;
             const cleanup = (): void => {
                 settled = true;
@@ -370,6 +372,9 @@ export class CheckoutElement {
                 cleanup();
                 this.status = 'loadError';
                 this.removeIframe();
+                if (registered) {
+                    this.releaseHostedElement();
+                }
                 const err = (payload as LoadErrorPayload)?.error;
                 reject(
                     err ??
@@ -402,6 +407,8 @@ export class CheckoutElement {
                 cleanup();
                 this.status = 'loadError';
                 this.removeIframe();
+                // Release the hosted registration so a retry mount() does not hit ELEMENT_CONFLICT.
+                this.releaseHostedElement();
                 reject(
                     makeError(
                         ErrorCode.RUNTIME_LOAD_FAILED,
@@ -418,16 +425,32 @@ export class CheckoutElement {
                     type: this.type,
                     options: this.options,
                 })
-                .catch((cmdErr: unknown) => {
-                    if (settled) {
-                        return;
+                .then(
+                    () => {
+                        registered = true;
+                    },
+                    (cmdErr: unknown) => {
+                        if (settled) {
+                            return;
+                        }
+                        cleanup();
+                        this.status = 'loadError';
+                        this.removeIframe();
+                        reject(cmdErr as CheckoutError);
                     }
-                    cleanup();
-                    this.status = 'loadError';
-                    this.removeIframe();
-                    reject(cmdErr as CheckoutError);
-                });
+                );
         });
+    }
+
+    /** Best-effort, fire-and-forget release of the hosted element registration; never throws. */
+    private releaseHostedElement(): void {
+        try {
+            void Promise.resolve(
+                this.transport.request('destroyElement', { elementId: this.elementId })
+            ).catch(() => undefined);
+        } catch {
+            // Ignore: release is best-effort.
+        }
     }
 
     /**
