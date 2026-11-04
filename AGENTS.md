@@ -213,3 +213,4 @@ loop.
 | Browser JS SDK | `js/AGENTS.md` |
 | React SDK (placeholder) | `react/AGENTS.md` |
 | Execution plan / spec | `docs/sdk-workspace-publish-plan.md` |
+ 
