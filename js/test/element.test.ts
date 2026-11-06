@@ -628,7 +628,7 @@ describe('CheckoutElement expressCheckout', () => {
 
         const evt = {
             operationId: 'op_1',
-            method: 'applePay',
+            method: 'APPLE_PAY',
             outcome: { status: 'succeeded', operationId: 'op_1', txnId: 'txn_1' },
         };
         transport.emit('paymentResult', evt);

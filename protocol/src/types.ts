@@ -34,8 +34,12 @@ export interface AddressInfo {
     phone?: string;
 }
 
-/** Payment methods supported in the first phase. */
-export type PaymentMethod = 'card' | 'applePay' | 'googlePay';
+/**
+ * 支付方式，与后端 `paymentMethod` 字段的大写枚举对齐（CARD / GOOGLE_PAY / APPLE_PAY /
+ * WECHAT_PAY / ALIPAY ...）。开放式联合：已知三种提供字面量补全与 `===` 窄化，其余后端
+ * 枚举无需破坏性发版即可携带。
+ */
+export type PaymentMethod = 'CARD' | 'GOOGLE_PAY' | 'APPLE_PAY' | (string & {});
 
 /**
  * Public payment method view (only exposes method/type/name/logoUrl, no internal config).

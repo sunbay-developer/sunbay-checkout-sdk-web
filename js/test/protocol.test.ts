@@ -540,7 +540,7 @@ describe('error event wallet diagnostics', () => {
         const stage: WalletErrorStage = 'merchantValidation';
         const payload: ErrorEvent = {
             operationId: 'op_1',
-            method: 'applePay',
+            method: 'APPLE_PAY',
             stage,
             error: {
                 code: 'payment_failed',

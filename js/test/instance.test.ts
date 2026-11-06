@@ -439,7 +439,7 @@ describe('CheckoutInstance.confirm', () => {
             operationId,
             txnId: 'txn_1',
         };
-        transport.emit('paymentResult', { operationId, method: 'card', outcome });
+        transport.emit('paymentResult', { operationId, method: 'CARD', outcome });
         await expect(promise).resolves.toEqual(outcome);
     });
 
@@ -475,7 +475,7 @@ describe('CheckoutInstance.destroy', () => {
             operationId,
             txnId: 'txn_1',
         };
-        transport.emit('paymentResult', { operationId, method: 'card', outcome: firstOutcome });
+        transport.emit('paymentResult', { operationId, method: 'CARD', outcome: firstOutcome });
         await expect(promise).resolves.toEqual(firstOutcome);
 
         // A late result after destroy must not throw, nor rewrite the already-settled Promise.
@@ -483,7 +483,7 @@ describe('CheckoutInstance.destroy', () => {
         expect(() =>
             transport.emit('paymentResult', {
                 operationId,
-                method: 'card',
+                method: 'CARD',
                 outcome: { status: 'failed', operationId, error: {} },
             })
         ).not.toThrow();

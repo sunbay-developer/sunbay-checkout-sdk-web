@@ -98,7 +98,7 @@ function opIdOf(transport: MockTransport): string {
 }
 
 function emitResult(transport: MockTransport, operationId: string, outcome: PaymentOutcome): void {
-    transport.emit('paymentResult', { operationId, method: 'card', outcome });
+    transport.emit('paymentResult', { operationId, method: 'CARD', outcome });
 }
 
 /** Track settlement of a promise without awaiting it. */
@@ -271,7 +271,7 @@ describe('CheckoutInstance.confirm lifecycle', () => {
         const operationId = opIdOf(transport);
         transport.emit('error', {
             operationId,
-            method: 'card',
+            method: 'CARD',
             stage: 'poll',
             error: {
                 code: 'X',
