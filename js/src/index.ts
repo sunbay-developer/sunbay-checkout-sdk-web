@@ -27,6 +27,7 @@ export type { Env } from './config/env';
 // Public protocol types (the contract for TS consumers).
 export {
     ErrorCode,
+    WARNING_CODES,
     type ErrorCodeValue,
     type CheckoutError,
     type CheckoutErrorCategory,
@@ -58,6 +59,8 @@ export {
     type EventName,
     type EventPayloadMap,
     type ErrorEvent,
+    type WarningEvent,
+    type WarningCode,
     type PaymentResultEvent,
     type PaymentStateChangeEvent,
     type ExpressAvailabilityChangeEvent,

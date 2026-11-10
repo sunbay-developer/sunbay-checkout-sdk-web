@@ -26,7 +26,8 @@ export type EventName =
     | 'expressAvailabilityChange'
     | 'paymentStateChange'
     | 'paymentResult'
-    | 'error';
+    | 'error'
+    | 'warning';
 
 /** Set of known event names. */
 export const EVENT_NAMES: readonly EventName[] = [
@@ -40,6 +41,7 @@ export const EVENT_NAMES: readonly EventName[] = [
     'paymentStateChange',
     'paymentResult',
     'error',
+    'warning',
 ];
 
 /** Determine whether a string is a known event name. */
@@ -108,6 +110,37 @@ export interface ErrorEvent {
     error: CheckoutError;
 }
 
+/**
+ * Cross-platform registry of `warning` event codes (single source of truth for Web, iOS, Android).
+ * Warnings are non-fatal: the offending input was ignored. A platform that needs a new code adds it
+ * here (and to the docs table) so every SDK shares one vocabulary.
+ */
+export const WARNING_CODES = {
+    /** A `paymentMethods` filter identifier matched nothing (unknown / not offered). */
+    PAYMENT_METHOD_FILTER_IGNORED: 'PAYMENT_METHOD_FILTER_IGNORED',
+    /** An expressCheckout option was not whitelisted or had an invalid value. */
+    EXPRESS_OPTION_IGNORED: 'EXPRESS_OPTION_IGNORED',
+    /** A host-provided billing/shipping address was incomplete, so it was treated as not provided. */
+    ADDRESS_INCOMPLETE: 'ADDRESS_INCOMPLETE',
+    /** A host-provided address was ignored because our Address Element owns that mode. */
+    ADDRESS_ENTRY_IGNORED: 'ADDRESS_ENTRY_IGNORED',
+} as const;
+
+/** Warning code (non-fatal; the offending input was ignored). */
+export type WarningCode = (typeof WARNING_CODES)[keyof typeof WARNING_CODES];
+
+/**
+ * Non-fatal warning: some merchant-supplied input was ignored instead of failing the call
+ * (e.g. an unknown `paymentMethods` filter identifier, or a non-whitelisted Express option).
+ */
+export interface WarningEvent {
+    code: WarningCode;
+    /** The ignored identifiers / option paths. */
+    ignored: string[];
+    /** Human-readable reason (may list the accepted values). */
+    reason: string;
+}
+
 /** Event name → payload mapping. */
 export interface EventPayloadMap {
     ready: ReadyEvent;
@@ -120,4 +153,5 @@ export interface EventPayloadMap {
     paymentStateChange: PaymentStateChangeEvent;
     paymentResult: PaymentResultEvent;
     error: ErrorEvent;
+    warning: WarningEvent;
 }

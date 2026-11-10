@@ -104,7 +104,9 @@ interface CreateCheckoutOptions {
     hostOrigin?: string; // override the hosted origin (takes precedence over env)
     locale?: string; // e.g. 'en', 'zh'
     appearance?: Appearance; // initial theming (see Appearance types)
-    paymentMethods?: PaymentMethodFilter; // subtract/reorder session methods
+    paymentMethods?: PaymentMethodFilter; // hide/reorder the session's methods (not the Express wallet toggles)
+    billingAddress?: AddressInfo; // host-collected billing address (see "Host-provided addresses")
+    shippingAddress?: AddressInfo; // host-collected shipping address
 }
 ```
 
@@ -115,7 +117,7 @@ interface CreateCheckoutOptions {
 | `hostOrigin`     | `string`             | no       | Explicit origin (no trailing slash); overrides `env`. For local dev/tests. |
 | `locale`         | `string`             | no       | Falls back to the session's language, then `en`.                      |
 | `appearance`     | `Appearance`         | no       | Serialized into each Element iframe `src` for a flash-free first frame. |
-| `paymentMethods` | `PaymentMethodFilter` | no      | Hide and/or reorder methods. Cannot enable methods the session disallowed. |
+| `paymentMethods` | `PaymentMethodFilter` | no      | Hide and/or reorder methods using backend identifiers (see [`PaymentMethodFilter`](#paymentmethod--paymentmethodfilter)). Cannot enable methods the session disallowed. Unknown identifiers are ignored with a `warning` event. |
 
 > There is also an internal `__transportFactory` injection point used by tests.
 > It is **not** part of the public API contract and must not be relied upon.
@@ -128,7 +130,7 @@ const checkout = await createCheckout({
     env: 'prod',
     locale: 'en',
     appearance: { colorScheme: 'light', variables: { colorPrimary: '#2266ee' } },
-    paymentMethods: { hide: ['applePay'], order: ['card', 'googlePay'] },
+    paymentMethods: { hide: ['APPLE_PAY'], order: ['CARD', 'GOOGLE_PAY'] },
 });
 ```
 
@@ -227,11 +229,41 @@ Returns a server payment-status snapshot verbatim (no transformation).
 ### `updateCheckout(patch)`
 
 ```ts
-updateCheckout(patch: { locale?: string; appearance?: Appearance }): Promise<void>;
+updateCheckout(patch: {
+    locale?: string;
+    appearance?: Appearance;
+    billingAddress?: AddressInfo;
+    shippingAddress?: AddressInfo;
+}): Promise<void>;
 ```
 
-Updates presentation (locale / appearance) at runtime. Does **not** change the
-session or the amount. **Rejects** `INSTANCE_DESTROYED` if destroyed.
+Updates presentation (locale / appearance) and the host-provided addresses at runtime. Does **not**
+change the session or the amount. Passing an address replaces the previous one (pass `{}` to clear it).
+**Rejects** `INSTANCE_DESTROYED` if destroyed, and `CHECKOUT_BUSY` if an address is passed while a
+payment is in progress.
+
+#### Host-provided addresses
+
+If your page already collected the billing and/or shipping address, pass it to `createCheckout` /
+`updateCheckout` so Apple Pay and Google Pay do **not** ask the user again.
+
+- **Complete** means: billing = `country`, `city`, `line1`, `postalCode`; shipping = those four plus a
+  name (`firstName` + `lastName`, or `recipientName`) and `phone`. An incomplete address is treated as
+  not provided (the wallet still asks) and a `warning` (`ADDRESS_INCOMPLETE`) is emitted.
+- A complete address makes the wallet skip asking for that address and submits yours instead. It can
+  only **reduce** what is asked: if the session does not require the address, yours is not submitted
+  (wallet or card). If the wallet itself returns an address, the wallet's wins. When the wallet did not
+  return a name, the shipping `recipientName` (or `firstName lastName`) is used.
+- For card payments it is the default for `confirm()` (also only when the session requires that
+  address). Priority per address:
+  `confirm({ billingAddress | shippingAddress })` > the mounted Address Element's draft > the address
+  passed here.
+- **Address Element:** it is optional (use it only if you do not build your own address form). If an
+  Address Element of that mode (billing / shipping) is mounted and has collected an address, the
+  address passed here is **ignored** and a `warning` (`ADDRESS_ENTRY_IGNORED`) is emitted. For wallets,
+  which must decide synchronously, the address passed here is ignored whenever an Address Element of
+  that mode exists.
+- Only the documented `AddressInfo` fields are accepted (strings only); anything else is dropped.
 
 ### `on(event, handler)` / `off(event, handler)`
 
@@ -448,6 +480,12 @@ Per-wallet toggle semantics:
   follows the current color scheme.
 - object form → auto-show and apply the fine-grained options.
 
+Only the display options documented here are accepted (`paymentMethods.applePay|googlePay`,
+`layout.maxColumns`, `buttonHeight`). Any other key, or a `buttonTheme` / `buttonType` outside the
+official values, is ignored and reported via a `warning` event (`code: 'EXPRESS_OPTION_IGNORED'`).
+Wallet payment parameters (merchant id, networks, gateway, …) come only from the backend session
+and cannot be overridden from the SDK.
+
 ---
 
 ## Appearance types
@@ -542,16 +580,69 @@ The public view intentionally excludes sensitive/internal fields (such as
 ### `PaymentMethod` & `PaymentMethodFilter`
 
 ```ts
-type PaymentMethod = 'card' | 'applePay' | 'googlePay';
+// Backend uppercase enum (open union): 'CARD' | 'GOOGLE_PAY' | 'APPLE_PAY' | (string & {})
+type PaymentMethod = string;
 
 interface PaymentMethodFilter {
-    hide?: string[]; // method identifiers to hide
-    order?: string[]; // display order (method identifiers)
+    hide?: string[]; // identifiers to hide
+    order?: string[]; // display order (identifiers)
 }
 ```
 
-The filter is subtractive/reordering only — it cannot enable methods the session
-did not allow.
+**Identifiers** use the backend values, matched **case-sensitively** — first against the
+logical key, then against the raw method:
+
+| Identifier                 | Matches                                                      |
+| -------------------------- | ------------------------------------------------------------ |
+| `CARD`                     | **All** card brands (VISA, MASTERCARD, AMEX, …)              |
+| `APPLE_PAY`, `GOOGLE_PAY`  | That wallet                                                  |
+| A raw method, e.g. `AMEX`  | Only that card brand (hide / order a single brand)           |
+| Other backend methods      | Same rule: use the backend `method` value                    |
+
+`order` lists the identifiers that come first; unlisted methods keep their original order after
+them. **Where `order` is visible:** the page layout is yours, so `order` only changes (1) the order
+of `session.paymentMethods` returned to you and (2) the order of the card brand icons inside the
+card Element. It does **not** reorder the Express wallet buttons — Apple Pay is always rendered
+before Google Pay. Legacy lower-case names (`card`, `applePay`, `googlePay`) are **not** recognized.
+
+The filter is subtractive/reordering only — it cannot enable methods the session did not allow.
+It is applied everywhere the methods are used: the `session.paymentMethods` returned by
+`createCheckout` / `getSession()` / `refresh()`, the Express wallet buttons, and the card brand icons.
+
+An identifier that matches nothing (unknown, or not offered to this user/merchant) is **ignored** —
+it never makes `createCheckout` / `getSession()` / `refresh()` fail. A `warning` event
+(`code: 'PAYMENT_METHOD_FILTER_IGNORED'`) is emitted once per identifier and a `console.warn` is logged.
+Warnings raised while `createCheckout` itself runs (before you have an instance) are delivered to the
+**first** `checkout.on('warning', …)` listener you register, asynchronously, exactly once.
+
+> **Not the same as the Express option.** `createCheckout({ paymentMethods })` filters the
+> session's methods. `expressCheckout`'s `paymentMethods: { applePay, googlePay }` toggles/styles
+> the wallet buttons of that Element. They are independent.
+>
+> The filter is set once at `createCheckout` and cannot be updated afterwards.
+
+### `WarningEvent` & warning codes
+
+```ts
+interface WarningEvent {
+    code: WarningCode; // one of WARNING_CODES
+    ignored: string[]; // ignored identifiers / option paths
+    reason: string;
+}
+```
+
+**Warning code registry (cross-platform).** The codes live in one place — `WARNING_CODES` in
+`@sunbay/checkout-sdk-protocol` — and are shared by the Web, iOS and Android SDKs. A platform that
+needs a new code adds it to `WARNING_CODES` and to this table; do not invent platform-local codes.
+
+| Code                             | Meaning                                                                        | `ignored` contains        |
+| -------------------------------- | ------------------------------------------------------------------------------ | ------------------------- |
+| `PAYMENT_METHOD_FILTER_IGNORED`  | A `paymentMethods` filter identifier matched nothing (or `hide`/`order` was not an array). | The identifiers (`hide` / `order` for a bad container) |
+| `EXPRESS_OPTION_IGNORED`         | An `expressCheckout` option was not whitelisted or had an invalid value.        | Option paths, e.g. `paymentMethods.applePay.buttonType` |
+| `ADDRESS_INCOMPLETE`             | A host-provided `billingAddress` / `shippingAddress` was incomplete, so it was treated as not provided. | `billingAddress` / `shippingAddress` |
+| `ADDRESS_ENTRY_IGNORED`          | A host-provided address was ignored because our Address Element owns that mode. | `billingAddress` / `shippingAddress` |
+
+Warnings are non-fatal, de-duplicated per `code + identifier`, and never change a payment outcome.
 
 ### `AddressInfo`
 
@@ -625,7 +716,8 @@ type EventName =
     | 'expressAvailabilityChange'
     | 'paymentStateChange'
     | 'paymentResult'
-    | 'error';
+    | 'error'
+    | 'warning';
 ```
 
 ### Element-level events
@@ -659,6 +751,7 @@ interface AvailableWallets {
 | `paymentStateChange` | `{ operationId; method; state; action? }`            | Intermediate/process info only.                              |
 | `paymentResult`      | `{ operationId; method; outcome: PaymentOutcome }`   | Covers card and express. Fulfills the matching `confirm()`.  |
 | `error`              | `{ operationId?; error: CheckoutError }`             | Async proactive-flow error (e.g. a wallet failure).          |
+| `warning`            | `{ code; ignored: string[]; reason: string }`        | Non-fatal: merchant input was ignored (see `WarningEvent`).  |
 
 ```ts
 interface PaymentAction {

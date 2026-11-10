@@ -22,6 +22,7 @@ import {
     ErrorCode,
     PROTOCOL_MAJOR,
     type Appearance,
+    type AddressInfo,
     type CheckoutError,
     type InitializeReq,
     type InitializeResp,
@@ -62,6 +63,13 @@ export interface CreateCheckoutOptions {
     appearance?: Appearance;
     /** Payment method filter (subtractive/reordering only). */
     paymentMethods?: PaymentMethodFilter;
+    /**
+     * Host-collected billing address. When complete, Apple Pay / Google Pay do not ask the user for
+     * it again, and it is used as the default for card `confirm()`.
+     */
+    billingAddress?: AddressInfo;
+    /** Host-collected shipping address (complete = address + name + phone). Same rules as above. */
+    shippingAddress?: AddressInfo;
     /** Internal injection point: custom transport factory (test use; not part of the public API contract). */
     __transportFactory?: TransportFactory;
 }
@@ -143,6 +151,8 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
         locale: opts.locale,
         appearance: opts.appearance,
         paymentMethods: opts.paymentMethods,
+        billingAddress: opts.billingAddress,
+        shippingAddress: opts.shippingAddress,
     };
     let initResp: InitializeResp;
     try {
@@ -159,6 +169,7 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
         transport,
         capabilities: initResp.capabilities,
         session: initResp.session,
+        initialWarnings: initResp.warnings,
         appearance: opts.appearance,
     });
 }
