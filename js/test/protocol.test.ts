@@ -600,6 +600,7 @@ describe('protocol warning code table', () => {
             EXPRESS_OPTION_IGNORED: 'EXPRESS_OPTION_IGNORED',
             ADDRESS_INCOMPLETE: 'ADDRESS_INCOMPLETE',
             ADDRESS_ENTRY_IGNORED: 'ADDRESS_ENTRY_IGNORED',
+            WALLET_PARAMS_INVALID: 'WALLET_PARAMS_INVALID',
         });
     });
 

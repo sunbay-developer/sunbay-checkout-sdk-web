@@ -124,6 +124,12 @@ export const WARNING_CODES = {
     ADDRESS_INCOMPLETE: 'ADDRESS_INCOMPLETE',
     /** A host-provided address was ignored because our Address Element owns that mode. */
     ADDRESS_ENTRY_IGNORED: 'ADDRESS_ENTRY_IGNORED',
+    /**
+     * The wallet (Apple Pay / Google Pay) payment parameters delivered by the session were missing
+     * or invalid, so that wallet is not offered. Registered for the native SDKs (iOS first); the Web
+     * runtime currently only logs this condition and does not emit the event.
+     */
+    WALLET_PARAMS_INVALID: 'WALLET_PARAMS_INVALID',
 } as const;
 
 /** Warning code (non-fatal; the offending input was ignored). */

@@ -641,8 +641,11 @@ needs a new code adds it to `WARNING_CODES` and to this table; do not invent pla
 | `EXPRESS_OPTION_IGNORED`         | An `expressCheckout` option was not whitelisted or had an invalid value.        | Option paths, e.g. `paymentMethods.applePay.buttonType` |
 | `ADDRESS_INCOMPLETE`             | A host-provided `billingAddress` / `shippingAddress` was incomplete, so it was treated as not provided. | `billingAddress` / `shippingAddress` |
 | `ADDRESS_ENTRY_IGNORED`          | A host-provided address was ignored because our Address Element owns that mode. | `billingAddress` / `shippingAddress` |
+| `WALLET_PARAMS_INVALID`          | The wallet's payment parameters delivered by the session (`ewalletParam`) are missing required fields or invalid, so that wallet is **not offered** (the rest of checkout keeps working). Raised by the native SDKs; the Web runtime currently only logs this and does not emit the event. | The wallet and the missing / invalid parameter names, e.g. `APPLE_PAY:merchantIdentifier` |
 
 Warnings are non-fatal, de-duplicated per `code + identifier`, and never change a payment outcome.
+`WALLET_PARAMS_INVALID` is informational: the wallet parameters come from your backend session, so it
+cannot be fixed through SDK options.
 
 ### `AddressInfo`
 
