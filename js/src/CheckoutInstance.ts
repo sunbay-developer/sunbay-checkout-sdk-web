@@ -23,6 +23,7 @@ import { CheckoutElement, type CheckoutElementOptions } from './Element';
 import {
     ErrorCode,
     type Appearance,
+    type AddressInfo,
     type CheckoutError,
     type CommandName,
     type ConfirmReq,
@@ -30,6 +31,7 @@ import {
     type ElementType,
     type EventName,
     type EventPayloadMap,
+    type WarningEvent,
     type GetPaymentStatusResp,
     type PaymentOutcome,
     type PaymentResultEvent,
@@ -67,6 +69,11 @@ export interface CheckoutInstanceOptions {
     capabilities: string[];
     /** The initial session view returned by initialize. */
     session: PublicSessionView;
+    /**
+     * Warnings produced during initialize (the instance did not exist yet, so they could not be
+     * delivered as events). Replayed once to the first `warning` listener.
+     */
+    initialWarnings?: WarningEvent[];
     /**
      * Initial appearance customization (from createCheckout's appearance).
      * Passed through to every created Element and serialized into its iframe src (no flash on the
@@ -166,7 +173,11 @@ export class CheckoutInstance {
 
     private destroyed = false;
 
+    /** Warnings from initialize not yet delivered to any `warning` listener. */
+    private pendingWarnings: WarningEvent[];
+
     constructor(opts: CheckoutInstanceOptions) {
+        this.pendingWarnings = opts.initialWarnings ? [...opts.initialWarnings] : [];
         this.checkoutId = opts.checkoutId;
         this.runtimeId = opts.runtimeId;
         this.capabilities = opts.capabilities;
@@ -375,7 +386,12 @@ export class CheckoutInstance {
      * @param patch - locale / appearance delta.
      * @throws rejects INSTANCE_DESTROYED when destroyed.
      */
-    async updateCheckout(patch: { locale?: string; appearance?: Appearance }): Promise<void> {
+    async updateCheckout(patch: {
+        locale?: string;
+        appearance?: Appearance;
+        billingAddress?: AddressInfo;
+        shippingAddress?: AddressInfo;
+    }): Promise<void> {
         this.assertAlive();
         const payload: UpdateCheckoutReq = patch;
         await this.transport.request('updateCheckout', payload);
@@ -393,6 +409,20 @@ export class CheckoutInstance {
         // The only typed→loose cast: the transport is loosely typed and the protocol guarantees the
         // payload shape per event name. The same function identity is passed, so `off` works as is.
         this.transport.on(event, handler as (payload: unknown) => void);
+        // Replay warnings raised during initialize to the first `warning` listener (once), async so
+        // the caller finishes its setup before the handler runs.
+        if (event === 'warning' && this.pendingWarnings.length > 0) {
+            const pending = this.pendingWarnings;
+            this.pendingWarnings = [];
+            queueMicrotask(() => {
+                if (this.destroyed) {
+                    return;
+                }
+                for (const w of pending) {
+                    (handler as (payload: WarningEvent) => void)(w);
+                }
+            });
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ import {
     type Envelope,
     type ErrorEvent,
     type WalletErrorStage,
+    type InitializeResp,
 } from '@sunbay/checkout-sdk-protocol';
 
 /**
@@ -154,7 +155,7 @@ describe('protocol error codes', () => {
  * Covers: ExpressCheckoutElementOptions exact structure encodes/decodes; AvailableWallets exists;
  * express availability event payload contains applePay/googlePay booleans.
  */
-import { EVENT_NAMES, isEventName } from '@sunbay/checkout-sdk-protocol';
+import { EVENT_NAMES, WARNING_CODES, isEventName } from '@sunbay/checkout-sdk-protocol';
 import type {
     Appearance,
     AppearanceVariables,
@@ -562,5 +563,54 @@ describe('error event wallet diagnostics', () => {
         };
         const decoded = decodeEnvelope(encodeEnvelope(wrap(payload)));
         expect(payloadOf(decoded)).toEqual(payload);
+    });
+});
+
+/**
+ * warning event registration contract: 'warning' is an EventName, listed in EVENT_NAMES, and
+ * EventPayloadMap['warning'] carries { code, ignored, reason }.
+ */
+describe('protocol warning event registration', () => {
+    it("'warning' is in EVENT_NAMES and recognized by isEventName", () => {
+        expect(EVENT_NAMES).toContain('warning');
+        expect(isEventName('warning')).toBe(true);
+    });
+
+    it("EventPayloadMap['warning'] carries code / ignored / reason", () => {
+        const payload: EventPayloadMap['warning'] = {
+            code: 'PAYMENT_METHOD_FILTER_IGNORED',
+            ignored: ['applePay'],
+            reason: 'Unknown payment method identifier "applePay"',
+        };
+        expect(payload.code).toBe('PAYMENT_METHOD_FILTER_IGNORED');
+        expect(payload.ignored).toEqual(['applePay']);
+        const other: EventPayloadMap['warning'] = {
+            code: 'EXPRESS_OPTION_IGNORED',
+            ignored: ['paymentMethods.applePay.buttonType'],
+            reason: 'x',
+        };
+        expect(other.code).toBe('EXPRESS_OPTION_IGNORED');
+    });
+});
+
+describe('protocol warning code table', () => {
+    it('WARNING_CODES is the single cross-platform registry of warning codes', () => {
+        expect(WARNING_CODES).toEqual({
+            PAYMENT_METHOD_FILTER_IGNORED: 'PAYMENT_METHOD_FILTER_IGNORED',
+            EXPRESS_OPTION_IGNORED: 'EXPRESS_OPTION_IGNORED',
+            ADDRESS_INCOMPLETE: 'ADDRESS_INCOMPLETE',
+            ADDRESS_ENTRY_IGNORED: 'ADDRESS_ENTRY_IGNORED',
+        });
+    });
+
+    it('InitializeResp may carry warnings produced during initialize', () => {
+        const resp: InitializeResp = {
+            capabilities: [],
+            session: {} as InitializeResp['session'],
+            warnings: [
+                { code: WARNING_CODES.PAYMENT_METHOD_FILTER_IGNORED, ignored: ['x'], reason: 'r' },
+            ],
+        };
+        expect(resp.warnings?.[0].code).toBe('PAYMENT_METHOD_FILTER_IGNORED');
     });
 });

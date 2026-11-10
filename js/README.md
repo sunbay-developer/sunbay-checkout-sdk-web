@@ -41,7 +41,8 @@ const outcome = await checkout.confirm();
 | `hostOrigin` | Overrides the hosted origin (takes precedence over `env`), e.g. `http://localhost:3000`. |
 | `locale` | UI locale, e.g. `'en-US'`, `'zh-CN'`. |
 | `appearance` | `{ variables, rules, colorScheme }` (whitelisted design variables, no arbitrary CSS). |
-| `paymentMethods` | `{ hide?: string[]; order?: string[] }` - subtract/sort only. |
+| `paymentMethods` | `{ hide?: string[]; order?: string[] }` - subtract/sort only, using backend identifiers (`CARD` = all card brands, `APPLE_PAY`, `GOOGLE_PAY`, or a raw method such as `AMEX`; case-sensitive). Unknown identifiers are ignored with a `warning` event. Not the same as the Express Element's `paymentMethods`. |
+| `billingAddress` / `shippingAddress` | Optional host-collected addresses. When complete, Apple Pay / Google Pay do not ask the user again, and card `confirm()` uses them as the default. Ignored (with a `warning`) if our Address Element of that mode is used. See `docs/api/api.md`. |
 
 The hosted runtime must serve `/embed/sdk/*` (SDK >= 0.0.7). Deploy the runtime before upgrading the SDK.
 
@@ -79,6 +80,7 @@ registration. Handler exceptions are isolated and rethrown asynchronously (they 
 | `paymentStateChange` | `{ operationId, method, state, action? }` | Intermediate state, e.g. requires action. |
 | `paymentResult` | `{ operationId, method, outcome }` | A payment outcome was produced. |
 | `error` | `{ operationId?, method?, stage?, error }` | Asynchronous error (wallet flows etc.). |
+| `warning` | `{ code, ignored, reason }` | Non-fatal: merchant input was ignored. Codes are the cross-platform `WARNING_CODES` registry (see `docs/api/api.md`). Warnings raised during `createCheckout` are replayed to the first listener. |
 
 ## Payment result semantics
 
@@ -171,7 +173,7 @@ challenges: it only emits the event. Your page must handle the action.
 - `unmount()` / `destroy()` while an element is loading rejects the in-flight `mount()`
   (`RUNTIME_LOAD_FAILED` / `INSTANCE_DESTROYED`). If you call `mount()` without
   `catch`/`await`, that surfaces as an **unhandled rejection**; always handle it.
-- `checkout.updateCheckout({ locale?, appearance? })` hot-switches locale/appearance.
+- `checkout.updateCheckout({ locale?, appearance?, billingAddress?, shippingAddress? })` hot-switches locale/appearance and replaces the host-provided addresses.
 - `getSession()`, `refresh()`, `getPaymentStatus()` read session/payment state.
 - `checkout.destroy()` is idempotent, removes all iframes, and later calls reject/throw
   `INSTANCE_DESTROYED`. Calling `destroy()` while a `confirm()` is pending rejects that

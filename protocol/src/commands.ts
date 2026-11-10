@@ -14,6 +14,7 @@ import type {
     PublicSessionView,
     TxnStatus,
 } from './types';
+import type { WarningEvent } from './events';
 
 /** All command names (spec 5.2). */
 export type CommandName =
@@ -59,6 +60,10 @@ export interface InitializeReq {
     locale?: string;
     appearance?: Appearance;
     paymentMethods?: PaymentMethodFilter;
+    /** Host-collected billing address; when complete, wallets do not ask for it again. */
+    billingAddress?: AddressInfo;
+    /** Host-collected shipping address; when complete, wallets do not ask for it again. */
+    shippingAddress?: AddressInfo;
     /**
      * Sensitive per-session secret (optional at the protocol level; the JS SDK enforces it).
      * Returned by the merchant backend's
@@ -69,6 +74,13 @@ export interface InitializeReq {
 export interface InitializeResp {
     capabilities: string[];
     session: PublicSessionView;
+    /**
+     * Non-fatal warnings produced while handling `initialize` (e.g. unknown `paymentMethods`
+     * filter identifiers). Events emitted during `initialize` cannot reach listeners (the instance
+     * does not exist yet), so they are carried here and replayed by the SDK to the first
+     * `warning` listener.
+     */
+    warnings?: WarningEvent[];
 }
 
 // --- createElement ---
@@ -114,6 +126,10 @@ export interface ElementActionResp {
 export interface UpdateCheckoutReq {
     locale?: string;
     appearance?: Appearance;
+    /** Replace the host-provided billing address (send `{}` to clear; `undefined` leaves it unchanged). */
+    billingAddress?: AddressInfo;
+    /** Replace the host-provided shipping address. */
+    shippingAddress?: AddressInfo;
 }
 export interface UpdateCheckoutResp {
     updated: true;

@@ -236,6 +236,48 @@ await billing.mount('#billing');
 const outcome = await checkout.confirm();
 ```
 
+### 6.2b Hide or reorder payment methods
+
+```ts
+const checkout = await createCheckout({
+    sessionId,
+    env: 'prod',
+    // Backend identifiers, case-sensitive: CARD = all card brands.
+    paymentMethods: { hide: ['APPLE_PAY'], order: ['CARD', 'GOOGLE_PAY'] },
+});
+
+// Unknown / unavailable identifiers never fail createCheckout; they are reported once
+// (warnings raised during createCheckout go to the first listener you register):
+checkout.on('warning', (w) => console.warn(w.code, w.ignored, w.reason));
+```
+
+This filters the session's methods everywhere (returned list, Express buttons, card brand icons).
+`order` only changes the returned list and the card brand icon order — your page layout is yours, and
+Express always shows Apple Pay before Google Pay.
+To toggle or style the Express wallet buttons themselves, use the Express Element's own
+`paymentMethods` option (see 6.3) — it is a different option.
+
+### 6.2c Pass an address you already collected
+
+```ts
+const checkout = await createCheckout({
+    sessionId,
+    checkoutClientSecret,
+    billingAddress: { country: 'US', city: 'San Francisco', line1: '1 Market St', postalCode: '94105' },
+    shippingAddress: {
+        country: 'US', city: 'Los Angeles', line1: '2 Sunset Blvd', postalCode: '90001',
+        recipientName: 'Jane Doe', phone: '+13105550100',
+    },
+});
+
+// Later, when your form changes:
+await checkout.updateCheckout({ shippingAddress: newShippingAddress });
+```
+
+Apple Pay / Google Pay then skip asking for any address that is **complete** (shipping needs a name and
+phone too). If you use our Address Element for a mode, that Element wins and the address passed here is
+ignored with a `warning`. See `api.md` → "Host-provided addresses".
+
 ### 6.3 Express checkout (Apple Pay / Google Pay)
 
 ```ts

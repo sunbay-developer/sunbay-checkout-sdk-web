@@ -502,6 +502,81 @@ describe('CheckoutInstance typed listeners', () => {
         expect(handler).not.toHaveBeenCalled();
     });
 
+    it('delivers warning events to on("warning") handlers with the full payload', async () => {
+        const { instance, transport } = await bootstrap();
+        const handler = vi.fn();
+        instance.on('warning', handler);
+        const payload = {
+            code: 'PAYMENT_METHOD_FILTER_IGNORED' as const,
+            ignored: ['applePay'],
+            reason: 'Unknown payment method identifier "applePay"',
+        };
+        transport.emit('warning', payload);
+        expect(handler).toHaveBeenCalledWith(payload);
+    });
+
+    it('replays warnings produced during initialize to the first warning listener', async () => {
+        const initWarning = {
+            code: 'PAYMENT_METHOD_FILTER_IGNORED' as const,
+            ignored: ['applePay'],
+            reason: 'Unknown payment method identifier "applePay"',
+        };
+        const { instance } = await bootstrap((t) => {
+            const base = t.requestImpl.bind(t);
+            t.requestImpl = async (name, payload) => {
+                const r = await base(name, payload);
+                return name === 'initialize'
+                    ? { ...(r as object), warnings: [initWarning] }
+                    : r;
+            };
+        });
+        const first = vi.fn();
+        instance.on('warning', first);
+        await Promise.resolve();
+        expect(first).toHaveBeenCalledTimes(1);
+        expect(first).toHaveBeenCalledWith(initWarning);
+
+        // Replayed once only.
+        const second = vi.fn();
+        instance.on('warning', second);
+        await Promise.resolve();
+        expect(second).not.toHaveBeenCalled();
+    });
+
+    it('createCheckout forwards billingAddress / shippingAddress in the initialize request', async () => {
+        const billingAddress = { country: 'US', city: 'SF', line1: '1 Main', postalCode: '94000' };
+        const shippingAddress = { ...billingAddress, recipientName: 'Jane', phone: '123' };
+        const transport = createMockTransport();
+        const promise = createCheckout({
+            sessionId: 'sess_1',
+            checkoutClientSecret: 'ccs_test',
+            hostOrigin: HOST_ORIGIN,
+            billingAddress,
+            shippingAddress,
+            __transportFactory: () => transport,
+        });
+        await Promise.resolve();
+        transport.fireHello(makeHello());
+        await promise;
+        const init = transport.requests.find((r) => r.name === 'initialize');
+        expect(init?.payload).toMatchObject({ billingAddress, shippingAddress });
+    });
+
+    it('updateCheckout forwards shippingAddress', async () => {
+        const { instance, transport } = await bootstrap();
+        const shippingAddress = {
+            country: 'US',
+            city: 'SF',
+            line1: '1 Main',
+            postalCode: '94000',
+            recipientName: 'Jane',
+            phone: '123',
+        };
+        await instance.updateCheckout({ shippingAddress });
+        const req = transport.requests.find((r) => r.name === 'updateCheckout');
+        expect(req?.payload).toMatchObject({ shippingAddress });
+    });
+
     it('infers the payload type from the event name', async () => {
         const { instance } = await bootstrap();
         instance.on('paymentResult', (e) => {

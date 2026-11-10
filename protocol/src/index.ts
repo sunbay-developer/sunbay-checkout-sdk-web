@@ -49,6 +49,7 @@ export {
 
 export {
     EVENT_NAMES,
+    WARNING_CODES,
     isEventName,
     type EventName,
     type EventPayloadMap,
@@ -62,6 +63,8 @@ export {
     type PaymentStateChangeEvent,
     type PaymentResultEvent,
     type ErrorEvent,
+    type WarningEvent,
+    type WarningCode,
 } from './events';
 
 export {
