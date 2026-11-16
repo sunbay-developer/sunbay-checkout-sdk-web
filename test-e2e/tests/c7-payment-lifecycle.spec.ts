@@ -14,9 +14,10 @@ import {
     slotIframeCount,
     slotFrame,
     getEvents,
+    typeIntoField,
 } from '../support/harness';
 import { getHealth } from '../support/env';
-import { SANDBOX_CARD_DEFAULT } from '../fixtures/test-cards';
+import { SANDBOX_CARD_DEFAULT, SANDBOX_CARD_DECLINED } from '../fixtures/test-cards';
 
 const SPLIT = [
     { type: 'cardNumber', slot: '#slot-num' },
@@ -24,6 +25,9 @@ const SPLIT = [
     { type: 'cardCvc', slot: '#slot-cvc' },
 ];
 const SPLIT_SLOTS = { number: '#slot-num', expiry: '#slot-exp', cvc: '#slot-cvc' };
+
+/** Backend duplicate-submit window per session (2 s, S11) plus a margin. */
+const DUPLICATE_SUBMIT_WINDOW_MS = 2_500;
 
 test.beforeEach(async ({ page }) => {
     await openHarness(page);
@@ -228,9 +232,11 @@ test('C7-09 locale runtime switch via updateCheckout @p2 @c7', async ({ page }) 
     });
     expect(r.ok, r.error?.message).toBe(true);
 
-    // Initial locale is en-US: the card iframe renders the English card-information title.
+    // Initial locale is en-US: the card element renders the English expiry placeholder.
+    // (The element no longer renders a "Card information" title; the localized text it shows
+    // is the placeholder of the expiry field.)
     const frame = slotFrame(page, '#slot-card');
-    await expect(frame.getByText('Card information')).toBeVisible({ timeout: 15_000 });
+    await expect(frame.getByPlaceholder('MM / YY')).toBeVisible({ timeout: 15_000 });
 
     // updateCheckout({ locale }) must be accepted (promise resolves, no error).
     await callHarness(page, 'updateCheckout', { locale: 'zh-CN' });
@@ -240,8 +246,8 @@ test('C7-09 locale runtime switch via updateCheckout @p2 @c7', async ({ page }) 
     // Runtime hot-switch: the hosted runtime broadcasts a localeChange signal to the
     // mounted element iframe, which loads the zh-CN bundle and re-drives next-intl. The
     // in-iframe text must switch en-US->zh-CN WITHOUT a reload.
-    await expect(frame.getByText('银行卡信息')).toBeVisible({ timeout: 15_000 });
-    await expect(frame.getByText('Card information')).toHaveCount(0);
+    await expect(frame.getByPlaceholder('月 / 年')).toBeVisible({ timeout: 15_000 });
+    await expect(frame.getByPlaceholder('MM / YY')).toHaveCount(0);
 });
 
 test('C7-10 multiple instances isolation @p2 @c7', async ({ page }) => {
@@ -273,4 +279,87 @@ test('C7-10 multiple instances isolation @p2 @c7', async ({ page }) => {
         return Boolean(s && s.sessionId);
     });
     expect(bStillWorks).toBe(true);
+});
+
+test('C7-08 multi-attempt session: declined card then retry on the same session @p0 @c7', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    // The test backend creates the session WITHOUT transactionRequestId (multi-attempt mode).
+    // Billing address collection is off: this page mounts card fields only, and with it on the
+    // backend rejects every submit with C17 ("Billing address is required"), which would mask the
+    // decline this case is about.
+    const r = await setup(page, {
+        session: 'auto',
+        collectBillingAddress: false,
+        elements: SPLIT,
+    });
+    expect(r.ok, r.error?.message).toBe(true);
+
+    type ConfirmResult = {
+        ok: boolean;
+        operationId?: string;
+        outcome?: { status: string; operationId: string };
+    };
+
+    try {
+        // Attempt 1: declined card. The attempt fails, the session must stay payable.
+        await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DECLINED);
+        const first = await callHarness<ConfirmResult>(page, 'confirm', {
+            resultTimeoutMs: 45_000,
+        });
+        expect(first.ok, JSON.stringify(first)).toBe(true);
+        expect(first.outcome?.status, JSON.stringify(first)).toBe('failed');
+        // A real transaction decline: the attempt has a txnId and carries no backend rejection code
+        // (a missing-field rejection such as C17 would have none of that).
+        const firstOutcome = first.outcome as
+            | { txnId?: string; error?: { backendCode?: string } }
+            | undefined;
+        expect(firstOutcome?.txnId, JSON.stringify(first)).toBeTruthy();
+        expect(firstOutcome?.error?.backendCode, JSON.stringify(first)).toBeUndefined();
+
+        // The backend blocks a new submit on the same session for 2 s after the previous one
+        // (duplicate-submit guard, backendCode S11). Wait it out so the retry is a real retry.
+        await page.waitForTimeout(DUPLICATE_SUBMIT_WINDOW_MS);
+
+        // Attempt 2 on the SAME session: a valid card now succeeds (no CHECKOUT_BUSY, no
+        // "session already completed / closed" rejection).
+        // Clear the previous attempt's values first so the fields are re-entered from scratch.
+        for (const slot of Object.values(SPLIT_SLOTS)) {
+            await typeIntoField(page, slot, '');
+        }
+        await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DEFAULT);
+        const second = await callHarness<ConfirmResult>(page, 'confirm', {
+            resultTimeoutMs: 45_000,
+        });
+        expect(second.ok, JSON.stringify(second)).toBe(true);
+        expect(second.operationId).not.toBe(first.operationId);
+        expect(second.outcome?.status, JSON.stringify(second)).toBe('succeeded');
+
+        await page.waitForTimeout(DUPLICATE_SUBMIT_WINDOW_MS);
+
+        // Attempt 3: the session is completed now, so the backend rejects a further payment (C10).
+        for (const slot of Object.values(SPLIT_SLOTS)) {
+            await typeIntoField(page, slot, '');
+        }
+        await fillCardAcrossIframes(page, SPLIT_SLOTS, SANDBOX_CARD_DEFAULT);
+        const third = await callHarness<ConfirmResult>(page, 'confirm', { resultTimeoutMs: 45_000 });
+        const thirdOutcome = third.outcome as
+            | { status: string; error?: { backendCode?: string } }
+            | undefined;
+        expect(thirdOutcome?.status, JSON.stringify(third)).toBe('failed');
+        expect(thirdOutcome?.error?.backendCode, JSON.stringify(third)).toBe('C10');
+
+        // All three attempts were reported, in order, with distinct operationIds.
+        const results = (await getEvents(page))
+            .filter((e) => e.name === 'paymentResult')
+            .map((e) => e.payload as { operationId: string; outcome: { status: string } });
+        expect(results.map((x) => x.outcome.status)).toEqual(['failed', 'succeeded', 'failed']);
+
+        // PCI: neither card appears in anything the parent page saw.
+        await assertNoCardLeak(page, SANDBOX_CARD_DECLINED);
+        await assertNoCardLeak(page, SANDBOX_CARD_DEFAULT);
+    } finally {
+        await callHarness(page, 'reset').catch(() => undefined);
+    }
 });

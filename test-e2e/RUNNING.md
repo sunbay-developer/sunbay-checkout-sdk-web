@@ -40,8 +40,23 @@ Real-device e2e needs two origins:
 
 | Service | Default | Who starts it |
 |---|---|---|
-| hosted runtime (checkout repo) | `http://localhost:3000` | Manually: `npm run dev` in the checkout repo |
+| hosted runtime (checkout repo) | `http://localhost:3000` | `npm run serve:dev` in the checkout repo (build with dev env vars, then `next start`). **Not** `npm run dev`. An agent starts and stops it itself, see below |
 | test backend + harness page | `http://localhost:8090` | **Playwright starts it automatically** (`webServer`); or manually `pnpm --filter @sunbay/checkout-sdk-e2e run server` |
+
+**Agent runbook for a real e2e run** (the agent does this itself; the usual "agent does not start
+long-running processes" rule has this one exception):
+
+1. Check: `curl -s -m 3 -o /dev/null -w '%{http_code}' http://localhost:3000/healthz`.
+   - `200`: the runtime is already up. Reuse it and **do not stop it afterwards**.
+   - Anything else: continue.
+2. Start it from `checkout/` in the background, logging to a file and recording the PID
+   (the build takes a few minutes): `nohup npm run serve:dev > /tmp/checkout-serve-dev.log 2>&1 &`.
+   It is `build:dev` + `next start`, a production-shaped artifact. `npm run dev` is wrong here:
+   Strict Mode double-mounts the runtime and the SDK handshake can time out.
+3. Poll `/healthz` until `200` (give up and report with the log tail after ~10 minutes).
+4. Build the SDK artifact and run the suite (section 3).
+5. Stop it whether the suite passed or failed, and only if the agent started it: kill the
+   process group, then confirm `:3000` is free (`lsof -iTCP:3000 -sTCP:LISTEN`).
 
 Check the hosted runtime is up:
 

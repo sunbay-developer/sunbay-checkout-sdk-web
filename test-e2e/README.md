@@ -78,7 +78,7 @@ cross-origin postMessage, `event.origin` checks, and cross-iframe channels:
 
 - Test harness page + test backend: same origin (default `http://localhost:8090`).
 - Hosted runtime: a different origin (default `http://localhost:3000`, i.e. the
-  `checkout` repo's `npm run dev`; or a deployed real environment).
+  `checkout` repo's `npm run serve:dev`; or a deployed real environment).
 
 > Why not verify this inside the `checkout` repo: the hosted page and a real
 > merchant page are **not same-origin**. Only a standalone-origin harness can
@@ -90,11 +90,13 @@ cross-origin postMessage, `event.origin` checks, and cross-iframe channels:
 ## 3. Prerequisites
 
 1. **Hosted runtime reachable**, serving `/embed/sdk/main`, `/embed/sdk/field/<type>`,
-   `/embed/sdk/element/<type>`. Locally use the `checkout` repo's `npm run dev` (:3000);
-   or point at a deployed environment. The runtime also keeps a legacy `/sdk/*` alias
-   (used by SDK <= 0.0.5); the SDK under test loads `/embed/sdk/*` only.
-   > Long-running processes (dev server) are started manually by the user; the
-   > test runner does not start them in the background.
+   `/embed/sdk/element/<type>`. Locally use the `checkout` repo's `npm run serve:dev` (:3000,
+   a production-shaped build, **not** `npm run dev`); or point at a deployed environment. The
+   runtime also keeps a legacy `/sdk/*` alias (used by SDK <= 0.0.5); the SDK under test loads
+   `/embed/sdk/*` only.
+   > Playwright does not start the hosted runtime. For an agent-driven real e2e run, the agent
+   > checks `/healthz`, starts `serve:dev` itself if needed, and stops it afterwards
+   > (see `RUNNING.md` §2).
 2. **SDK IIFE build present**: `js/dist/index.global.js`
    (`pnpm --filter @sunbay/checkout-sdk-js run build`). The harness loads the
    **real published artifact** (not source), so it tests the shipped form.
