@@ -4,6 +4,22 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The SDK and
 `@sunbay/checkout-sdk-protocol` share the same version number.
 
+## [Unreleased]
+
+### Added
+
+- Protocol: `SessionStatus` type (`ACTIVE | COMPLETED | INACTIVE | EXPIRED`, open union) and an
+  optional `sessionStatus` on `GetPaymentStatusResp`.
+
+### Changed
+
+- Protocol: `GetPaymentStatusResp.txnStatus` is now optional. It can be absent when the session
+  is `EXPIRED`. TypeScript code that reads `txnStatus` must handle `undefined`.
+- Docs: a session can hold several payment attempts. `failed` ends the attempt, not the session,
+  so `confirm()` can be called again and one session can emit several `paymentResult` events.
+  Create the session without `transactionRequestId` to enable this.
+- Docs: `SESSION_LOAD_FAILED` is also returned when the session is no longer payable.
+
 ## [0.0.7] - 2026-10-30
 
 > There is no `@sunbay/checkout-sdk-js@0.0.6`. A `0.0.6` release was started, but the release

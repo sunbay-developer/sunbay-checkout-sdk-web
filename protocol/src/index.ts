@@ -69,6 +69,7 @@ export {
 
 export {
     type TxnStatus,
+    type SessionStatus,
     type AddressInfo,
     type PaymentMethod,
     type PublicPaymentMethod,

@@ -166,7 +166,11 @@ test('C7-06 getSession / refresh / getPaymentStatus @p1 @c7', async ({ page }) =
     expect(out.session).toHaveProperty('sessionId');
     expect(out.session).not.toHaveProperty('rsaPublicKey');
     expect(out.refreshed).toHaveProperty('sessionId');
-    expect(['I', 'S', 'F', 'R']).toContain(out.status.txnStatus);
+    // txnStatus may be absent (for example when the session is expired); it only describes the
+    // latest transaction, while sessionStatus (when reported) describes the session itself.
+    if (out.status.txnStatus !== undefined) {
+        expect(['I', 'S', 'F', 'R']).toContain(out.status.txnStatus);
+    }
 });
 
 test('C7-07 destroy idempotent + post-destroy -> INSTANCE_DESTROYED @p1 @c7', async ({ page }) => {

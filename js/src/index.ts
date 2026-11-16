@@ -40,6 +40,7 @@ export {
     type Appearance,
     type AddressInfo,
     type TxnStatus,
+    type SessionStatus,
     type ElementType,
     type ElementOptions,
     type ElementStatus,

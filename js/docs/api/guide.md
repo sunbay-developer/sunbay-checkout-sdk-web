@@ -57,6 +57,10 @@ merchant API key). The browser only ever receives a `sessionId`. Amount,
 currency, product lines, and the merchant's address-collection requirements all
 come from the session — the client cannot override them.
 
+To let the buyer retry after a failed payment (change the payment method or try again
+until it succeeds), create the session **without** `transactionRequestId`. If you send
+`transactionRequestId`, the session can only be paid once.
+
 ---
 
 ## 2. Installation
@@ -176,6 +180,11 @@ iframe).
 `destroy()` and create a new instance. Amount, currency, and the backend's
 `collectBillingAddress` / `collectShippingAddress` requirements all come from the
 session.
+
+A session also has its own status (`ACTIVE`, `COMPLETED`, `INACTIVE`, `EXPIRED`), separate
+from the latest transaction's `txnStatus`. A failed attempt leaves a multi-attempt session
+`ACTIVE`, so `confirm()` can be called again. Once the buyer has paid, treat the
+`paymentResult` event and your backend's query-session as the source of truth.
 
 ---
 

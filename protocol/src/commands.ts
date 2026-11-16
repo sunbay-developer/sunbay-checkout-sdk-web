@@ -12,6 +12,7 @@ import type {
     ElementType,
     PaymentMethodFilter,
     PublicSessionView,
+    SessionStatus,
     TxnStatus,
 } from './types';
 import type { WarningEvent } from './events';
@@ -142,7 +143,13 @@ export type GetSessionResp = PublicSessionView;
 // --- getPaymentStatus (returns TxnStatus verbatim, no translation) ---
 export type GetPaymentStatusReq = Record<string, never>;
 export interface GetPaymentStatusResp {
-    txnStatus: TxnStatus;
+    /**
+     * Latest transaction status. May be absent when the session is `EXPIRED` and the backend
+     * has no transaction to report.
+     */
+    txnStatus?: TxnStatus;
+    /** Status of the session itself. Absent on backends that do not report it. */
+    sessionStatus?: SessionStatus;
     txnId?: string;
 }
 

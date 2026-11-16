@@ -372,7 +372,7 @@ export class CheckoutInstance {
     /**
      * Query the payment status (returns TxnStatus as-is, no transformation).
      *
-     * @returns txnStatus (may include txnId).
+     * @returns txnStatus (may be absent when the session is expired), sessionStatus and txnId.
      * @throws rejects INSTANCE_DESTROYED when destroyed.
      */
     async getPaymentStatus(): Promise<GetPaymentStatusResp> {

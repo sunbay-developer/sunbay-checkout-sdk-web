@@ -91,6 +91,9 @@ registration. Handler exceptions are isolated and rethrown asynchronously (they 
 - `pending` or any unknown state is **not a failure**. Do **not** retry or let the user
   pay again. Reconcile with `getPaymentStatus()` (`txnStatus`: `I|S|F|R`) and wait for the
   terminal `paymentResult` event.
+- `failed` ends the attempt, not the session: on a multi-attempt session (created without
+  `transactionRequestId`) the buyer can retry, so one session may emit several
+  `paymentResult` events. De-duplicate by `operationId`; the first `succeeded` is final.
 - The confirm slot stays held (`CHECKOUT_BUSY`) until a terminal result arrives, or you
   call `destroy()` and create a new instance with `createCheckout`. This also applies
   after the watchdog resolved `pending`.

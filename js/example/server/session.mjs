@@ -92,12 +92,14 @@ export async function createSession(input = {}) {
     const orderAmount = items.reduce((sum, i) => sum + Number(i.amount) * Number(i.num), 0);
     const taxAmount = Math.round(orderAmount * 0.08);
     const now = Date.now();
+    // Used only for the X-Client-Request-Id header. Do NOT also send it as transactionRequestId in
+    // the body: omitting that field creates a multi-attempt session (the buyer can retry after a
+    // failed payment); sending it makes the session payable only once.
     const requestId = `EX${now}`;
     const orderId = `EX${now}`;
 
     const payload = {
         appId: CONFIG.appId,
-        transactionRequestId: requestId,
         referenceOrderId: orderId,
         merchantId: CONFIG.merchantId,
         amount: {
