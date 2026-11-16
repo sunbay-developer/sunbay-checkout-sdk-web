@@ -6,10 +6,11 @@ in full before starting any task, and follow it strictly.**
 
 > This repository is the standalone git repo for the public **Web** SDK. It sits
 > **alongside but separate from** the consumer `checkout` (Next.js hosted
-> runtime). Changes here must not directly modify the `checkout` repo.
-> **Native SDKs (react-native / ios / android) are not in this repo**: they are
-> maintained in their own repositories (planned). This repo covers Web only
-> (protocol + js [+ react]).
+> runtime, at `../../checkout`). Changes here must not directly modify the
+> `checkout` repo. The `online-payment/` map is in `../../AGENTS.md`.
+> **Native SDKs are not in this repo**: they live in `../checkout-sdk-native/`
+> (`ios/`, `showcase-ios/`, `android/` placeholder), each as its own repository.
+> This repo covers Web only (protocol + js [+ react]).
 
 ---
 
@@ -177,7 +178,7 @@ card-isolation invariant.
 
 ```bash
 # 1) checkout hosted runtime (separate terminal; the agent does not start long-running processes)
-cd ../checkout && npm run dev            # :3000
+cd ../../checkout && npm run dev            # :3000
 # 2) build the SDK artifacts the harness loads (IIFE dist/index.global.js)
 pnpm --filter @sunbay/checkout-sdk-js run build
 # 3) configure sandbox credentials (first time): cp test-e2e/.env.example test-e2e/.env.local and fill them in
