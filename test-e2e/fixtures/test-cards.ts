@@ -51,10 +51,22 @@ export const SANDBOX_CARD_DEFAULT: SandboxCard = {
 export const INVALID_CARD_NUMBER = '4111111111111112';
 
 /**
+ * Sandbox card the sandbox merchant DECLINES ("Do not honor"), for the multi-attempt (retry)
+ * case C7-08. Like the default card it is a sandbox-only test card and never settles money.
+ */
+export const SANDBOX_CARD_DECLINED: SandboxCard = {
+    cardNumber: '4012000005000052',
+    expiryMonth: '12',
+    expiryYear: '2028',
+    cvv: '999',
+};
+
+/**
  * All sandbox cards, keyed by a stable id for test-case references.
  * Extend this map when additional sandbox scenarios (declined, 3DS, etc.) are
  * provided by the sandbox merchant.
  */
 export const SANDBOX_CARDS: Record<string, SandboxCard> = {
     default: SANDBOX_CARD_DEFAULT,
+    declined: SANDBOX_CARD_DECLINED,
 };

@@ -163,8 +163,8 @@ test('C8-01 merchant validation failure -> error + failed paymentResult @p1 @c8'
     const events = await getEvents(page);
     const errors = opEvents(events, 'error');
     const results = opEvents(events, 'paymentResult');
-    const err = errors.find((e) => e.method === 'applePay' && e.stage === 'merchantValidation');
-    expect(err, `error event with method=applePay stage=merchantValidation: ${JSON.stringify(errors)}`).toBeTruthy();
+    const err = errors.find((e) => e.method === 'APPLE_PAY' && e.stage === 'merchantValidation');
+    expect(err, `error event with method=APPLE_PAY stage=merchantValidation: ${JSON.stringify(errors)}`).toBeTruthy();
     // Decision: this scenario is backend-rejection-driven (bogus validationURL rejected by
     // the sandbox merchant-validation API, which responds with { code, traceId }), so
     // backendCode and traceId MUST be present. Asserted strictly; if the backend stops
@@ -214,8 +214,8 @@ test('C8-03 failure after authorization, before submit -> authorization error + 
     const events = await getEvents(page);
     const errors = opEvents(events, 'error');
     const results = opEvents(events, 'paymentResult');
-    const err = errors.find((e) => e.method === 'applePay' && e.stage === 'authorization');
-    expect(err, `error event with method=applePay stage=authorization: ${JSON.stringify(errors)}`).toBeTruthy();
+    const err = errors.find((e) => e.method === 'APPLE_PAY' && e.stage === 'authorization');
+    expect(err, `error event with method=APPLE_PAY stage=authorization: ${JSON.stringify(errors)}`).toBeTruthy();
     const failed = results.find((r) => r.outcome?.status === 'failed');
     expect(failed, `failed paymentResult: ${JSON.stringify(results)}`).toBeTruthy();
     expect(failed!.operationId).toBeTruthy();
