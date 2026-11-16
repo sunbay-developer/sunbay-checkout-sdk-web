@@ -9,7 +9,7 @@ in full before starting any task, and follow it strictly.**
 > runtime, at `../../checkout`). Changes here must not directly modify the
 > `checkout` repo. The `online-payment/` map is in `../../AGENTS.md`.
 > **Native SDKs are not in this repo**: they live in `../checkout-sdk-native/`
-> (`ios/`, `showcase-ios/`, `android/` placeholder), each as its own repository.
+> (`ios/`, `ios-checkout-sdk-showcase/`, `android/` placeholder), each as its own repository.
 > This repo covers Web only (protocol + js [+ react]).
 
 ---
