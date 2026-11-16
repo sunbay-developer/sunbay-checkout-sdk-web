@@ -220,11 +220,17 @@ updates the local snapshot. Does not auto-retry payment. **Rejects**
 
 ```ts
 getPaymentStatus(): Promise<GetPaymentStatusResp>;
-// GetPaymentStatusResp = { txnStatus: TxnStatus; txnId?: string }
+// GetPaymentStatusResp = { txnStatus?: TxnStatus; sessionStatus?: SessionStatus; txnId?: string }
 ```
 
 Returns a server payment-status snapshot verbatim (no transformation).
-**Rejects** `INSTANCE_DESTROYED` if destroyed. See [`TxnStatus`](#txnstatus).
+`txnStatus` is the latest transaction only and may be absent when the session is
+`EXPIRED`. `sessionStatus` is the status of the session itself (see
+[`SessionStatus`](#sessionstatus)). **Rejects** `INSTANCE_DESTROYED` if destroyed.
+See [`TxnStatus`](#txnstatus).
+
+> After the buyer has paid, the session is no longer payable. Prefer the `paymentResult`
+> event and your backend's query-session over polling `getPaymentStatus()` from the page.
 
 ### `updateCheckout(patch)`
 
@@ -665,6 +671,24 @@ interface AddressInfo {
 }
 ```
 
+### `SessionStatus`
+
+```ts
+type SessionStatus = 'ACTIVE' | 'COMPLETED' | 'INACTIVE' | 'EXPIRED' | (string & {});
+```
+
+A session can hold several payment attempts; `txnStatus` only describes the latest one.
+
+| Value       | Meaning                                                                                  |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| `ACTIVE`    | Payable. Stays `ACTIVE` after failed attempts, so the buyer can retry.                   |
+| `COMPLETED` | Multi-attempt: paid successfully. Single-attempt: the transaction reached `S` or `F`.    |
+| `INACTIVE`  | The order was closed or already paid.                                                    |
+| `EXPIRED`   | Expired, invalidated by the merchant, or no longer known. **Not** proof that nothing was paid. |
+
+Multi-attempt sessions are created by **not** sending `transactionRequestId` to
+`create-session`; if it is sent, the session can only be paid once.
+
 ### `TxnStatus`
 
 ```ts
@@ -700,6 +724,12 @@ type PaymentOutcome =
 `operationId` identifies one client interaction and is distinct from the server
 `txnId`. Consumers must **not** accept only the first result for an operation —
 `pending` is not terminal.
+
+`failed` is terminal for that attempt, **not** for the session. On a multi-attempt session
+the buyer can call `confirm()` again (a new `operationId`), so one session can emit several
+`paymentResult` events. De-duplicate by `operationId` and treat the first `succeeded` as final.
+Calling `confirm()` after the session is completed, closed or expired is rejected by the
+backend (error `backendCode` `C10`, `C11` or `C30`).
 
 ---
 
@@ -797,7 +827,7 @@ ErrorCode.VALIDATION_ERROR; // 'VALIDATION_ERROR'
 | `INSTANCE_DESTROYED`     | Using an instance/Element after `destroy()`, or a pending `confirm()` on destroy. | throw / reject    |
 | `CHECKOUT_BUSY`          | `confirm()` called while a confirmation is already in progress.                   | reject            |
 | `VALIDATION_ERROR`       | Card validation failed during `confirm()`.                                        | reject            |
-| `SESSION_LOAD_FAILED`    | The session could not be loaded during `initialize`.                              | reject            |
+| `SESSION_LOAD_FAILED`    | The session could not be loaded during `initialize`, or it is no longer payable (completed, closed or expired; the message carries the status). | reject            |
 | `RUNTIME_LOAD_FAILED`    | Handshake timed out, or the main iframe / element failed to load.                 | reject            |
 | `PROTOCOL_UNSUPPORTED`   | No common protocol major version between SDK and runtime.                         | reject            |
 | `REQUEST_TIMEOUT`        | A protocol command timed out.                                                     | reject            |

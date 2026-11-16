@@ -17,6 +17,20 @@
 export type TxnStatus = 'I' | 'S' | 'F' | 'R';
 
 /**
+ * Status of the checkout session itself (reuses the backend session status verbatim).
+ * `txnStatus` only describes the latest transaction; a session may hold several attempts.
+ * - `ACTIVE` = payable; stays `ACTIVE` after failed attempts, so the buyer can retry
+ * - `COMPLETED` = multi-attempt: paid successfully; single-attempt: the transaction reached a
+ *   terminal state (`S` or `F`, check `txnStatus`)
+ * - `INACTIVE` = the order was closed or already paid
+ * - `EXPIRED` = expired, invalidated by the merchant, or no longer known to the backend. This is
+ *   **not** proof that no payment succeeded; use the server-side query-session to confirm.
+ *
+ * Open union: values added by the backend later are carried without a breaking release.
+ */
+export type SessionStatus = 'ACTIVE' | 'COMPLETED' | 'INACTIVE' | 'EXPIRED' | (string & {});
+
+/**
  * Address information (aligned with the checkout backend AddressInfo fields).
  * Non-sensitive data; allowed to be transmitted over the public protocol.
  */

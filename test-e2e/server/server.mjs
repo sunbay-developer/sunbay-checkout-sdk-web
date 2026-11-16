@@ -98,12 +98,12 @@ async function createSession(input) {
     const orderAmount = items.reduce((sum, i) => sum + Number(i.amount) * Number(i.num), 0);
     const taxAmount = Math.round(orderAmount * 0.08);
     const now = Date.now();
+    // Header only; transactionRequestId is intentionally not sent in the body (multi-attempt session).
     const requestId = `E2E${now}`;
     const orderId = `E2E${now}`;
 
     const payload = {
         appId: CONFIG.appId,
-        transactionRequestId: requestId,
         referenceOrderId: orderId,
         merchantId: CONFIG.merchantId,
         amount: {
