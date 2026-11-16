@@ -103,7 +103,12 @@ pnpm --filter @sunbay/checkout-sdk-js run build
 - **Build order**: `js` type-check/build depends on protocol's `dist` (types and
   artifacts). CI/scripts must build protocol first.
 - **Long-running processes** (watch / dev) are started manually by the user; the
-  agent must not start them in the background.
+  agent must not start them in the background. **Exception: real e2e runs.** Before running
+  `test-e2e`, the agent checks whether the hosted runtime is up on `:3000`
+  (`curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/healthz`). If not, it starts
+  `npm run serve:dev` in `checkout/` itself (a production-shaped build served by `next start`,
+  not `npm run dev`), waits for `/healthz`, runs the suite, and stops the server afterwards,
+  but only a server it started. See `test-e2e/RUNNING.md` §2.
 
 ---
 
@@ -177,8 +182,10 @@ at init and runtime), express wallet options, the card payment flow, and the PCI
 card-isolation invariant.
 
 ```bash
-# 1) checkout hosted runtime (separate terminal; the agent does not start long-running processes)
-cd ../../checkout && npm run dev            # :3000
+# 1) checkout hosted runtime on :3000. Use serve:dev (production-shaped build), NOT `npm run dev`:
+#    the dev server double-mounts under Strict Mode and the SDK handshake can time out.
+#    The agent starts/stops it itself for real e2e runs (see the long-running-processes rule above).
+cd ../../checkout && npm run serve:dev      # :3000
 # 2) build the SDK artifacts the harness loads (IIFE dist/index.global.js)
 pnpm --filter @sunbay/checkout-sdk-js run build
 # 3) configure sandbox credentials (first time): cp test-e2e/.env.example test-e2e/.env.local and fill them in
