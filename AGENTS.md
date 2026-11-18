@@ -6,10 +6,10 @@ in full before starting any task, and follow it strictly.**
 
 > This repository is the standalone git repo for the public **Web** SDK. It sits
 > **alongside but separate from** the consumer `checkout` (Next.js hosted
-> runtime, at `../../checkout`). Changes here must not directly modify the
-> `checkout` repo. The `online-payment/` map is in `../../AGENTS.md`.
-> **Native SDKs are not in this repo**: they live in `../checkout-sdk-native/`
-> (`ios/`, `ios-checkout-sdk-showcase/`, `android/` placeholder), each as its own repository.
+> runtime, at `../../checkout-hosted`). Changes here must not directly modify the
+> `checkout` repo. The `checkout/` map is in `../../AGENTS.md`.
+> **Native SDKs are not in this repo**: they live in `../native/`
+> (`ios/`, `android/` placeholder; the iOS demo app is in `../../showcase/sdk-for-ios`), each as its own repository.
 > This repo covers Web only (protocol + js [+ react]).
 
 ---
@@ -106,7 +106,7 @@ pnpm --filter @sunbay/checkout-sdk-js run build
   agent must not start them in the background. **Exception: real e2e runs.** Before running
   `test-e2e`, the agent checks whether the hosted runtime is up on `:3000`
   (`curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/healthz`). If not, it starts
-  `npm run serve:dev` in `checkout/` itself (a production-shaped build served by `next start`,
+  `npm run serve:dev` in `checkout-hosted/` itself (a production-shaped build served by `next start`,
   not `npm run dev`), waits for `/healthz`, runs the suite, and stops the server afterwards,
   but only a server it started. See `test-e2e/RUNNING.md` §2.
 
@@ -185,7 +185,7 @@ card-isolation invariant.
 # 1) checkout hosted runtime on :3000. Use serve:dev (production-shaped build), NOT `npm run dev`:
 #    the dev server double-mounts under Strict Mode and the SDK handshake can time out.
 #    The agent starts/stops it itself for real e2e runs (see the long-running-processes rule above).
-cd ../../checkout && npm run serve:dev      # :3000
+cd ../../checkout-hosted && npm run serve:dev      # :3000
 # 2) build the SDK artifacts the harness loads (IIFE dist/index.global.js)
 pnpm --filter @sunbay/checkout-sdk-js run build
 # 3) configure sandbox credentials (first time): cp test-e2e/.env.example test-e2e/.env.local and fill them in
