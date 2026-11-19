@@ -281,6 +281,34 @@ describe('CheckoutElement colorScheme passthrough to iframe src', () => {
     });
 });
 
+describe('CheckoutElement address options passthrough to iframe src', () => {
+    function srcOf(options: import('@sunbay/checkout-sdk-protocol').ElementOptions, id: string): string {
+        const el = makeElement(createMockTransport(), 'address', id, undefined, undefined, options);
+        const container = makeContainer(`t-${id}`);
+        void el.mount(container);
+        return container.querySelector('iframe')?.getAttribute('src') ?? '';
+    }
+
+    it('carries mode and style=simple', () => {
+        const src = srcOf({ mode: 'billing', style: 'simple' }, 'el_addr_simple');
+        expect(src).toContain('mode=billing');
+        expect(src).toContain('&style=simple');
+    });
+
+    it('carries style=full when set explicitly', () => {
+        expect(srcOf({ mode: 'shipping', style: 'full' }, 'el_addr_full')).toContain('&style=full');
+    });
+
+    it('omits style when not set (hosted defaults to full)', () => {
+        expect(srcOf({ mode: 'billing' }, 'el_addr_none')).not.toContain('style=');
+    });
+
+    it('drops an unknown style value', () => {
+        const options = { mode: 'billing', style: 'compact' } as unknown as import('@sunbay/checkout-sdk-protocol').ElementOptions;
+        expect(srcOf(options, 'el_addr_bad')).not.toContain('style=');
+    });
+});
+
 describe('CheckoutElement appearance passthrough to iframe src', () => {
     it('iframe src carries &appearance= when appearance with variables is provided (decoded contains those variables)', () => {
         const transport = createMockTransport();

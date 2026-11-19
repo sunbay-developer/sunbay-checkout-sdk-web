@@ -88,6 +88,7 @@ export {
     type CardElementOptions,
     type CardFieldElementOptions,
     type AddressElementOptions,
+    type AddressFormStyle,
     type ApplePayButtonTheme,
     type GooglePayButtonTheme,
     type ApplePayButtonType,

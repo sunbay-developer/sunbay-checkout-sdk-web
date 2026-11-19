@@ -241,6 +241,8 @@ await checkout.create('cardCvc').mount('#card-cvc');
 
 const billing = checkout.create('address', { mode: 'billing' });
 await billing.mount('#billing');
+// Short form: country, address line 1 and postal code only.
+// checkout.create('address', { mode: 'billing', style: 'simple' });
 
 const outcome = await checkout.confirm();
 ```

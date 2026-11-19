@@ -8,6 +8,11 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ### Added
 
+- `address` Element option `style: 'full' | 'simple'` (default `'full'`). `simple` shows only
+  country, address line 1 and postal code (shipping also asks for first and last name). Protocol:
+  `AddressElementOptions.style` and the `AddressFormStyle` type. Needs a hosted runtime that
+  supports it; older runtimes ignore the option and keep the full form.
+
 - Protocol: `SessionStatus` type (`ACTIVE | COMPLETED | INACTIVE | EXPIRED`, open union) and an
   optional `sessionStatus` on `GetPaymentStatusResp`.
 

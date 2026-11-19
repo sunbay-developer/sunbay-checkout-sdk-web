@@ -447,9 +447,18 @@ interface CardFieldElementOptions {
 ```ts
 interface AddressElementOptions {
     mode: 'billing' | 'shipping'; // required; immutable after creation
+    style?: 'full' | 'simple'; // default 'full'; immutable after creation
     appearance?: Appearance;
 }
 ```
+
+- `style: 'full'` (default) renders the country-specific full address form.
+- `style: 'simple'` renders only country, address line 1 and postal code. A shipping form also
+  asks for the recipient's first and last name. Use it when the backend accepts a short
+  address (for example a coffee order with a billing address).
+- `style` cannot be changed with `update()`; destroy and recreate the Element instead. Unknown
+  values fall back to `'full'`.
+- Apple Pay / Google Pay are not affected: they collect the address in the wallet sheet.
 
 ### `ExpressCheckoutElementOptions` (`expressCheckout`)
 
