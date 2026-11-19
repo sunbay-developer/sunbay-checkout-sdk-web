@@ -265,9 +265,19 @@ export interface CardFieldElementOptions {
     appearance?: Appearance;
 }
 
+/**
+ * Address form layout.
+ * - `'full'`: the country-specific full address form (default).
+ * - `'simple'`: country, address line 1 and postal code only (shipping also asks for the
+ *   recipient's first and last name).
+ */
+export type AddressFormStyle = 'full' | 'simple';
+
 /** address Element options (spec 6). */
 export interface AddressElementOptions {
     mode: 'billing' | 'shipping';
+    /** Form layout; defaults to `'full'`. Fixed at creation (recreate the Element to change it). */
+    style?: AddressFormStyle;
     appearance?: Appearance;
 }
 

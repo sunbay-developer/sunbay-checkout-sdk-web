@@ -683,9 +683,14 @@ export class CheckoutElement {
         // correct same-origin field channel (address:<mode>). Without it, both address
         // Elements fall back to the default mode and the second never pairs/readies.
         if (this.type === 'address') {
-            const mode = (this.options as { mode?: string } | undefined)?.mode;
+            const { mode, style } = (this.options as { mode?: string; style?: unknown } | undefined) ?? {};
             if (mode) {
                 query += `&mode=${encodeURIComponent(mode)}`;
+            }
+            // style: only the known values travel; anything else falls back to the default
+            // full form on the hosted side, so it is simply not sent.
+            if (style === 'simple' || style === 'full') {
+                query += `&style=${style}`;
             }
         }
         if (this.colorScheme) {

@@ -55,7 +55,7 @@ with a CSS selector or an empty `HTMLElement`.
 | --- | --- | --- |
 | `card` | `showBillingAddress`, `showShippingAddress`, `showPostalCode`, `appearance` | Combined card form. Exclusive with split fields. |
 | `cardNumber` / `cardExpiry` / `cardCvc` | `appearance` | Split fields. Exclusive with `card`. |
-| `address` | `mode: 'billing' \| 'shipping'` (required), `appearance` | One per mode. |
+| `address` | `mode: 'billing' \| 'shipping'` (required), `style: 'full' \| 'simple'` (default `'full'`), `appearance` | One per mode. `simple` = country, address line 1, postal code (+ first and last name for shipping). |
 | `expressCheckout` | `paymentMethods.applePay` / `googlePay` (`false` hides; or `{ buttonTheme, buttonType }`), `layout.maxColumns`, `buttonHeight` (30-64, default 40) | Singleton. Wallet buttons. |
 
 Handle methods: `mount`, `unmount`, `update(patch)`, `destroy`, `getStatus`,
