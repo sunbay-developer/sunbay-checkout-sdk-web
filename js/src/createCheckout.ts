@@ -57,7 +57,11 @@ export interface CreateCheckoutOptions {
     env?: Env;
     /** Override the hosted origin (takes precedence over env). */
     hostOrigin?: string;
-    /** Locale. */
+    /**
+     * Initial locale, e.g. `'en-US'` or `'zh-CN'`. Sent to the runtime and appended to every
+     * Element iframe src, so the first frame renders in that language. Unknown values fall back to
+     * the browser language. Change it later with `updateCheckout({ locale })`.
+     */
     locale?: string;
     /** Appearance customization. */
     appearance?: Appearance;
@@ -171,6 +175,7 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
         session: initResp.session,
         initialWarnings: initResp.warnings,
         appearance: opts.appearance,
+        locale: opts.locale,
     });
 }
 

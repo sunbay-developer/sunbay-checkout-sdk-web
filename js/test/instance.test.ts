@@ -133,7 +133,7 @@ function createMockTransport(): MockTransport {
 /** Start createCheckout and drive hello on the next tick, returning the instance and mock. */
 async function bootstrap(
     overrides?: (t: MockTransport) => void,
-    createOpts?: { appearance?: Appearance }
+    createOpts?: { appearance?: Appearance; locale?: string }
 ): Promise<{ instance: CheckoutInstance; transport: MockTransport }> {
     const transport = createMockTransport();
     overrides?.(transport);
@@ -142,6 +142,7 @@ async function bootstrap(
         checkoutClientSecret: 'ccs_test',
         hostOrigin: HOST_ORIGIN,
         appearance: createOpts?.appearance,
+        locale: createOpts?.locale,
         __transportFactory: () => transport,
     });
     // Wait until createHiddenIframe is called & onHello is registered before firing the handshake.
@@ -340,6 +341,22 @@ describe('CheckoutInstance.create releases the mutual-exclusion slot after destr
         expect(() => instance.create('card')).toThrowError(
             expect.objectContaining({ code: ErrorCode.INSTANCE_DESTROYED })
         );
+    });
+});
+
+describe('CheckoutInstance locale passthrough', () => {
+    it('createCheckout({ locale }) reaches the initialize request and every Element iframe src', async () => {
+        const { instance } = await bootstrap(undefined, { locale: 'en-US' });
+        const element = instance.create('card');
+        const container = document.createElement('div');
+        container.id = 'locale-instance-target';
+        document.body.appendChild(container);
+
+        void element.mount(container);
+        const src = container.querySelector('iframe')?.getAttribute('src') ?? '';
+        expect(src).toContain('&locale=en-US');
+
+        document.body.innerHTML = '';
     });
 });
 
