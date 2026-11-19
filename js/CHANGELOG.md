@@ -6,6 +6,8 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-19
+
 ### Added
 
 - `address` Element option `style: 'full' | 'simple'` (default `'full'`). `simple` shows only
