@@ -6,6 +6,14 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- `createCheckout({ locale })` now sets the language of the Element iframes from the first frame.
+  The locale is appended to every Element iframe src as `&locale=`. Before, the initial `locale`
+  was sent to the runtime but never applied, so iframes followed the browser language until
+  `updateCheckout({ locale })` was called. Needs a hosted runtime that reads the `locale` query
+  parameter; older runtimes keep the browser language.
+
 ## [0.1.0] - 2026-11-19
 
 ### Added

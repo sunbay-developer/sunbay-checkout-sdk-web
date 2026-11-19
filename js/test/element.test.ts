@@ -252,6 +252,35 @@ describe('CheckoutElement.mount', () => {
     });
 });
 
+describe('CheckoutElement locale passthrough to iframe src', () => {
+    function srcFor(locale: string | undefined, id: string): string {
+        const el = new CheckoutElement({
+            elementId: `el_${id}`,
+            type: 'card',
+            hostOrigin: HOST_ORIGIN,
+            checkoutId: CHECKOUT_ID,
+            transport: createMockTransport(),
+            locale,
+        });
+        const container = makeContainer(`t-locale-${id}`);
+        void el.mount(container);
+        return container.querySelector('iframe')?.getAttribute('src') ?? '';
+    }
+
+    it('appends &locale=<value> when a locale is provided', () => {
+        expect(srcFor('en-US', 'a')).toContain('&locale=en-US');
+    });
+
+    it('does not append locale when absent or empty', () => {
+        expect(srcFor(undefined, 'b')).not.toContain('locale=');
+        expect(srcFor('', 'c')).not.toContain('locale=');
+    });
+
+    it('encodes the value', () => {
+        expect(srcFor('a&b', 'd')).toContain('&locale=a%26b');
+    });
+});
+
 describe('CheckoutElement colorScheme passthrough to iframe src', () => {
     it('iframe src carries colorScheme=<value> when colorScheme is provided', () => {
         const transport = createMockTransport();

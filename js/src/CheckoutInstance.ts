@@ -83,6 +83,11 @@ export interface CheckoutInstanceOptions {
      * Not appended when absent. Runtime switching goes through the updateCheckout command.
      */
     appearance?: Appearance;
+    /**
+     * Initial locale (from createCheckout's `locale`). Passed through to every created Element and
+     * appended to its iframe src as `&locale=`, so the first frame renders in that language.
+     */
+    locale?: string;
 }
 
 /** Default time (ms) `confirm()` waits for a terminal outcome before resolving `pending`. */
@@ -155,6 +160,8 @@ export class CheckoutInstance {
     private session: PublicSessionView;
     /** Initial appearance customization (passed through to each created Element's iframe src). */
     private readonly appearance: Appearance | undefined;
+    /** Initial locale (passed through to each created Element's iframe src). */
+    private readonly locale: string | undefined;
 
     /** Created Elements (indexed by elementId). */
     /**
@@ -185,6 +192,7 @@ export class CheckoutInstance {
         this.transport = opts.transport;
         this.session = opts.session;
         this.appearance = opts.appearance;
+        this.locale = opts.locale;
 
         this.paymentResultHandler = (payload: unknown): void => {
             this.handlePaymentResult(payload);
@@ -219,6 +227,7 @@ export class CheckoutInstance {
             initialOptions: options,
             colorScheme: this.appearance?.colorScheme,
             appearance: this.appearance,
+            locale: this.locale,
             onDestroy: (id: string) => this.releaseElement(id),
         };
         const element = CheckoutElement.create(elementOpts);

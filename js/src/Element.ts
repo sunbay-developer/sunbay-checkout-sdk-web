@@ -88,6 +88,13 @@ export interface CheckoutElementOptions {
      * `&colorScheme=`. Runtime switching goes through the updateCheckout command, not here.
      */
     appearance?: Appearance;
+    /**
+     * Initial locale (from createCheckout's `locale`). When provided and non-empty it is appended
+     * to the iframe src as `&locale=<value>`, so the hosted iframe renders in that language on the
+     * first frame (no flash). The hosted side resolves it to a supported language and ignores
+     * unknown values. Runtime switching goes through the updateCheckout command, not here.
+     */
+    locale?: string;
 }
 
 /** Default time (ms) `mount()` waits for the hosted Element to become ready. */
@@ -176,6 +183,8 @@ export class CheckoutElement {
     private readonly colorScheme: 'light' | 'dark' | 'auto' | undefined;
     /** Initial appearance customization (appended to the iframe src when it contains variables/rules; not appended when absent or colorScheme-only). */
     private readonly appearance: Appearance | undefined;
+    /** Initial locale (appended to the iframe src; not appended when absent or empty). */
+    private readonly locale: string | undefined;
     /** Destruction callback (injected by the instance): called at the end of destroy() so the instance removes itself from the mutual-exclusion registry to free the slot. */
     private readonly onDestroy: ((elementId: string) => void) | undefined;
 
@@ -221,6 +230,7 @@ export class CheckoutElement {
         this.options = opts.initialOptions;
         this.colorScheme = opts.colorScheme;
         this.appearance = opts.appearance;
+        this.locale = opts.locale;
         this.mode = (opts.initialOptions as { mode?: string } | undefined)?.mode;
         this.onDestroy = opts.onDestroy;
         this.installInputActions();
@@ -668,7 +678,8 @@ export class CheckoutElement {
      * (no flash on the first frame); if the initial appearance contains variables or rules, append
      * `&appearance=<encodeURIComponent(JSON.stringify(appearance))>` (takes effect on the first
      * frame, no flash). An appearance containing only colorScheme (no variables/rules) is not
-     * appended, to avoid an empty appearance string. For expressCheckout, additionally append the
+     * appended, to avoid an empty appearance string. If an initial locale is provided, append
+     * `&locale=<value>` (first frame renders in that language). For expressCheckout, additionally append the
      * wallet toggles / per-wallet buttonType / global buttonHeight (see {@link resolveExpressQuery}).
      *
      * elementId is sent with the src so the hosted child echoes it verbatim in iframe-resize
@@ -695,6 +706,10 @@ export class CheckoutElement {
         }
         if (this.colorScheme) {
             query += `&colorScheme=${encodeURIComponent(this.colorScheme)}`;
+        }
+        // Initial locale for the first frame (the hosted side validates it).
+        if (this.locale) {
+            query += `&locale=${encodeURIComponent(this.locale)}`;
         }
         // Effective appearance for the first frame: a per-element appearance (from
         // create(type, { appearance })) takes precedence over the instance-level appearance
