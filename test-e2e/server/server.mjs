@@ -122,7 +122,7 @@ async function createSession(input) {
         sessionType: 'embedded',
     };
 
-    const res = await fetch(`${CONFIG.openApiUrl}/v1/checkout/create-session`, {
+    const res = await fetch(`${CONFIG.openApiUrl}/v2/checkout/session/create`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
