@@ -40,7 +40,7 @@ try {
 export const DEFAULT_AMOUNT = 0.01;
 
 export const CONFIG = {
-    openApiUrl: process.env.OPEN_API_URL ?? 'https://open.sunbay-dev.com',
+    openApiUrl: process.env.OPEN_API_URL,
     apiKey: process.env.API_KEY,
     appId: process.env.APP_ID,
     merchantId: process.env.MERCHANT_ID,
@@ -116,7 +116,7 @@ export async function createSession(input = {}) {
         sessionType: 'embedded',
     };
 
-    const res = await fetch(`${CONFIG.openApiUrl}/v1/checkout/create-session`, {
+    const res = await fetch(`${CONFIG.openApiUrl}/v2/checkout/session/create`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
