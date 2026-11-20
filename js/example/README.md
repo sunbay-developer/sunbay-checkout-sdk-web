@@ -93,11 +93,11 @@ Read by `server/server.mjs` from `example/.env.local` (git-ignored).
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
+| `OPEN_API_URL` | yes (for sessions) | — | Open-platform base URL, for example `https://open.sunbay-dev.com`. |
 | `API_KEY` | yes (for sessions) | — | Sandbox merchant key; stays server-side. |
 | `APP_ID` | yes (for sessions) | — | Sandbox app id. |
 | `MERCHANT_ID` | yes (for sessions) | — | Sandbox merchant id. |
 | `PORT` | no | `8095` | Example server port. |
-| `OPEN_API_URL` | no | `https://open.sunbay-dev.com` | Open-platform base for create-session. |
 | `CURRENCY` | no | `USD` | Session currency. |
 | `HOSTED_ORIGIN` | no | `http://localhost:3000` | Hosted runtime origin the SDK points at (exposed to the pages via `/healthz`). |
 
