@@ -48,7 +48,9 @@ export const CONFIG = {
 };
 
 /** True when all required sandbox credentials are present. */
-export const HAS_CREDENTIALS = Boolean(CONFIG.apiKey && CONFIG.appId && CONFIG.merchantId);
+export const HAS_CREDENTIALS = Boolean(
+    CONFIG.openApiUrl && CONFIG.apiKey && CONFIG.appId && CONFIG.merchantId
+);
 
 /** Convert a MAJOR-unit amount (e.g. 0.01) to minor units (cents): 0.01 -> 1. */
 function toMinorUnits(major) {
@@ -70,7 +72,7 @@ export async function createSession(input = {}) {
     if (!HAS_CREDENTIALS) {
         throw new Error(
             'Sandbox merchant credentials missing. Copy example/.env.example to ' +
-                'example/.env.local and fill in API_KEY / APP_ID / MERCHANT_ID.'
+                'example/.env.local and fill in OPEN_API_URL / API_KEY / APP_ID / MERCHANT_ID.'
         );
     }
 

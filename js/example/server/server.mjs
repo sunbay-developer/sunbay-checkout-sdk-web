@@ -145,7 +145,7 @@ const server = createServer(async (req, res) => {
                 sendJson(res, 503, {
                     error:
                         'Sandbox merchant credentials missing. Copy example/.env.example to ' +
-                        'example/.env.local and fill in API_KEY / APP_ID / MERCHANT_ID. ' +
+                        'example/.env.local and fill in OPEN_API_URL / API_KEY / APP_ID / MERCHANT_ID. ' +
                         'The UI is still inspectable without them.',
                 });
                 return;
