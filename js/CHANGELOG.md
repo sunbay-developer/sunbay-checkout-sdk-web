@@ -6,6 +6,8 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-23
+
 ### Added
 
 - `checkout.getPaymentMethods()` returns the session's methods split into `express` (wallets, each
@@ -14,6 +16,8 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 - `Element.getState()` returns the last `change` state (`empty`, `complete`, `brand?`, `error?`) of an
   input Element, tracked from construction, so a late `change` subscriber can read the current value.
   New type `ElementState`. The Element now keeps one internal `change` subscription.
+
+## [0.1.1] - 2026-11-20
 
 ### Fixed
 
