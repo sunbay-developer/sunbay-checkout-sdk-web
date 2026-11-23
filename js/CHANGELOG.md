@@ -6,6 +6,15 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- `checkout.getPaymentMethods()` returns the session's methods split into `express` (wallets, each
+  with the device `available` flag, `undefined` until an `expressCheckout` Element reports it) and
+  `regular`. New types `PaymentMethodsView` and `ExpressMethodView` in the protocol package.
+- `Element.getState()` returns the last `change` state (`empty`, `complete`, `brand?`, `error?`) of an
+  input Element, tracked from construction, so a late `change` subscriber can read the current value.
+  New type `ElementState`. The Element now keeps one internal `change` subscription.
+
 ### Fixed
 
 - `createCheckout({ locale })` now sets the language of the Element iframes from the first frame.

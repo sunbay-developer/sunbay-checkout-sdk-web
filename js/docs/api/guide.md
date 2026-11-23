@@ -332,6 +332,9 @@ number.on('change', (evt) => {
     if (evt.brand) showBrandIcon(evt.brand);
 });
 await number.mount('#card-number');
+
+// Events are not replayed, so set the initial Pay button state by reading the snapshot:
+payButton.disabled = !number.getState()?.complete;
 ```
 
 ### 6.5 Cleaning up
@@ -435,7 +438,10 @@ variables and rule targets.
 
 Register handlers with `on(event, handler)` and remove them with
 `off(event, handler)`. Historical events are **not** replayed after you
-subscribe, so bind listeners **before** `mount()` / `confirm()`.
+subscribe, so bind listeners **before** `mount()` / `confirm()`. To read the current
+value instead of waiting for an event, use `Element.getState()` (input fields),
+`Element.getAvailableWallets()` (express) and `checkout.getPaymentMethods()` (which wallets and
+other methods to render).
 
 > `on()` returns `void` (it does not return an unsubscribe function). Keep a
 > reference to the handler and pass it to `off()` to unsubscribe.
