@@ -24,6 +24,7 @@ import {
     ErrorCode,
     type Appearance,
     type AddressInfo,
+    type AvailableWallets,
     type CheckoutError,
     type CommandName,
     type ConfirmReq,
@@ -34,6 +35,7 @@ import {
     type WarningEvent,
     type GetPaymentStatusResp,
     type PaymentOutcome,
+    type PaymentMethodsView,
     type PaymentResultEvent,
     type PublicSessionView,
     type UpdateCheckoutReq,
@@ -363,6 +365,41 @@ export class CheckoutInstance {
         const resp = (await this.transport.request('getSession', {})) as PublicSessionView;
         this.session = resp;
         return resp;
+    }
+
+    /**
+     * The session's payment methods split into quick wallets (`express`) and everything else
+     * (`regular`), from the local session snapshot (already filtered by `paymentMethods`).
+     *
+     * Each express entry carries `available` from the `expressCheckout` Element's availability
+     * snapshot; it is `undefined` while no such Element exists or it has not reported yet.
+     *
+     * @returns The split view.
+     * @throws INSTANCE_DESTROYED when destroyed.
+     */
+    getPaymentMethods(): PaymentMethodsView {
+        this.assertAlive();
+        let wallets: AvailableWallets | undefined;
+        for (const element of this.elements.values()) {
+            if (element.type === 'expressCheckout') {
+                wallets = element.getAvailableWallets();
+            }
+        }
+        const view: PaymentMethodsView = { express: [], regular: [] };
+        for (const method of this.session.paymentMethods) {
+            if (method.method === 'APPLE_PAY' || method.method === 'GOOGLE_PAY') {
+                const available =
+                    wallets === undefined
+                        ? undefined
+                        : method.method === 'APPLE_PAY'
+                          ? wallets.applePay
+                          : wallets.googlePay;
+                view.express.push({ ...method, available });
+            } else {
+                view.regular.push({ ...method });
+            }
+        }
+        return view;
     }
 
     /**

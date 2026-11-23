@@ -65,6 +65,41 @@ export interface PublicPaymentMethod {
     logoUrl: string;
 }
 
+/**
+ * A wallet offered by the session (after the merchant's `paymentMethods` filter), as returned by
+ * `getPaymentMethods()` in `express`.
+ */
+export interface ExpressMethodView extends PublicPaymentMethod {
+    /**
+     * Whether this wallet can pay on the current device/browser. `undefined` until an
+     * `expressCheckout` Element has reported its availability (created and ready); the session alone
+     * cannot tell.
+     */
+    available: boolean | undefined;
+}
+
+/**
+ * The session's payment methods split for layout decisions (`getPaymentMethods()`).
+ * `express` holds the wallets (`APPLE_PAY`, `GOOGLE_PAY`); `regular` holds every other method (card
+ * brands and other backend methods). Both keep the order of `PublicSessionView.paymentMethods`.
+ */
+export interface PaymentMethodsView {
+    express: ExpressMethodView[];
+    regular: PublicPaymentMethod[];
+}
+
+/**
+ * Snapshot of an input Element's last `change` event (`Element.getState()`). Never contains values.
+ */
+export interface ElementState {
+    empty: boolean;
+    complete: boolean;
+    /** Only the card number field may carry brand. */
+    brand?: string;
+    /** The validation error of the last change, absent when the field is valid or untouched. */
+    error?: CheckoutError;
+}
+
 /** Public product line. */
 export interface PublicProductLine {
     amount: number;

@@ -59,7 +59,7 @@ with a CSS selector or an empty `HTMLElement`.
 | `expressCheckout` | `paymentMethods.applePay` / `googlePay` (`false` hides; or `{ buttonTheme, buttonType }`), `layout.maxColumns`, `buttonHeight` (30-64, default 40) | Singleton. Wallet buttons. |
 
 Handle methods: `mount`, `unmount`, `update(patch)`, `destroy`, `getStatus`,
-`getAvailableWallets` (express), `on`, `off`. A conflicting `create` throws `ELEMENT_CONFLICT`.
+`getAvailableWallets` (express), `getState` (inputs), `on`, `off`. A conflicting `create` throws `ELEMENT_CONFLICT`.
 
 ## Events
 
@@ -177,7 +177,7 @@ challenges: it only emits the event. Your page must handle the action.
   (`RUNTIME_LOAD_FAILED` / `INSTANCE_DESTROYED`). If you call `mount()` without
   `catch`/`await`, that surfaces as an **unhandled rejection**; always handle it.
 - `checkout.updateCheckout({ locale?, appearance?, billingAddress?, shippingAddress? })` hot-switches locale/appearance and replaces the host-provided addresses.
-- `getSession()`, `refresh()`, `getPaymentStatus()` read session/payment state.
+- `getSession()`, `refresh()`, `getPaymentStatus()` read session/payment state. `getPaymentMethods()` splits the methods into `express` (wallets, with device `available`) and `regular`.
 - `checkout.destroy()` is idempotent, removes all iframes, and later calls reject/throw
   `INSTANCE_DESTROYED`. Calling `destroy()` while a `confirm()` is pending rejects that
   `confirm()` with `INSTANCE_DESTROYED`.

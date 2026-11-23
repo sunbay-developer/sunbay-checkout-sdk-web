@@ -206,6 +206,24 @@ getSession(): Promise<PublicSessionView>;
 Fetches the latest session view and updates the local snapshot. **Rejects**
 `INSTANCE_DESTROYED` if destroyed.
 
+### `getPaymentMethods()`
+
+```ts
+getPaymentMethods(): PaymentMethodsView;
+// PaymentMethodsView = { express: ExpressMethodView[]; regular: PublicPaymentMethod[] }
+// ExpressMethodView  = PublicPaymentMethod & { available: boolean | undefined }
+```
+
+Synchronous. Splits the session's methods (already filtered by `paymentMethods`) from the local
+snapshot, keeping their order. `express` holds the wallets (`APPLE_PAY`, `GOOGLE_PAY`); `regular`
+holds every other method (card brands and other backend methods). Use it to decide what to render,
+for example whether to show an "express" label.
+
+`available` says whether the wallet can pay on this device. It is `undefined` until an
+`expressCheckout` Element exists and has reported availability (from `elementReady`, then
+`expressAvailabilityChange`). Read it again after the Element is ready. The snapshot follows
+`getSession()` / `refresh()`. **Throws** `INSTANCE_DESTROYED` if destroyed.
+
 ### `refresh()`
 
 ```ts
@@ -380,6 +398,19 @@ getAvailableWallets(): AvailableWallets | undefined;
 **`expressCheckout` only.** Returns the current wallet-availability snapshot
 (initially from `elementReady`, then updated by `expressAvailabilityChange`).
 Returns `undefined` for other types or before ready.
+
+### `getState()`
+
+```ts
+getState(): ElementState | undefined;
+// ElementState = { empty: boolean; complete: boolean; brand?: string; error?: CheckoutError }
+```
+
+**Input Elements only** (`card`, `cardNumber`, `cardExpiry`, `cardCvc`, `address`). Returns a copy of
+the last `change` state, tracked from construction, so it is correct even if you subscribe to `change`
+late (events are not replayed; browser autofill can fire before your handler exists). Starts as
+`{ empty: true, complete: false }`. Never contains values. Returns `undefined` for `expressCheckout`.
+Still readable after `destroy()`. Use it to set the initial state of your Pay button.
 
 ### `on(event, handler)` / `off(event, handler)`
 
@@ -587,6 +618,22 @@ interface PublicPaymentMethod {
     name: string;
     logoUrl: string;
 }
+
+interface ExpressMethodView extends PublicPaymentMethod {
+    available: boolean | undefined; // undefined until an expressCheckout Element reports it
+}
+
+interface PaymentMethodsView {
+    express: ExpressMethodView[]; // APPLE_PAY, GOOGLE_PAY offered by the session
+    regular: PublicPaymentMethod[]; // card brands and other methods
+}
+
+interface ElementState {
+    empty: boolean;
+    complete: boolean;
+    brand?: string;
+    error?: CheckoutError;
+}
 ```
 
 The public view intentionally excludes sensitive/internal fields (such as
@@ -785,6 +832,9 @@ interface AvailableWallets {
     googlePay: boolean;
 }
 ```
+
+Events carry changes only. Read the current value with `Element.getState()` (inputs),
+`Element.getAvailableWallets()` (express) or `CheckoutInstance.getPaymentMethods()` (method split).
 
 ### Checkout-level events
 

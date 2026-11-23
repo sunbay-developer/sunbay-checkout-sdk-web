@@ -602,3 +602,58 @@ describe('CheckoutInstance typed listeners', () => {
         });
     });
 });
+
+describe('CheckoutInstance.getPaymentMethods', () => {
+    const methods = [
+        { method: 'VISA', type: 'CARD', name: 'Visa', logoUrl: 'v.png' },
+        { method: 'APPLE_PAY', type: 'E_WALLET', name: 'Apple Pay', logoUrl: 'a.png' },
+        { method: 'GOOGLE_PAY', type: 'E_WALLET', name: 'Google Pay', logoUrl: 'g.png' },
+    ];
+
+    async function bootWithMethods(): Promise<{ instance: CheckoutInstance; transport: MockTransport }> {
+        return bootstrap((t) => {
+            const base = t.requestImpl.bind(t);
+            t.requestImpl = (name, payload) =>
+                name === 'initialize'
+                    ? Promise.resolve({
+                          capabilities: ['card'],
+                          session: { ...makeSession(), paymentMethods: methods },
+                      })
+                    : base(name, payload);
+        });
+    }
+
+    it('splits wallets (express) from the other methods (regular), keeping order', async () => {
+        const { instance } = await bootWithMethods();
+        const view = instance.getPaymentMethods();
+        expect(view.express.map((m) => m.method)).toEqual(['APPLE_PAY', 'GOOGLE_PAY']);
+        expect(view.regular.map((m) => m.method)).toEqual(['VISA']);
+        expect(view.express[0]).toMatchObject({ name: 'Apple Pay', logoUrl: 'a.png' });
+    });
+
+    it('reports device availability as undefined until an express Element has reported it', async () => {
+        const { instance } = await bootWithMethods();
+        expect(instance.getPaymentMethods().express.map((m) => m.available)).toEqual([undefined, undefined]);
+    });
+
+    it('fills availability from the express Element snapshot', async () => {
+        const { instance, transport } = await bootWithMethods();
+        instance.create('expressCheckout');
+        transport.emit('expressAvailabilityChange', {
+            availableWallets: { applePay: false, googlePay: true },
+        });
+        expect(instance.getPaymentMethods().express.map((m) => [m.method, m.available])).toEqual([
+            ['APPLE_PAY', false],
+            ['GOOGLE_PAY', true],
+        ]);
+    });
+
+    it('has no express entries when the session offers no wallet, and throws after destroy', async () => {
+        const { instance } = await bootstrap();
+        expect(instance.getPaymentMethods()).toEqual({ express: [], regular: [] });
+        instance.destroy();
+        expect(() => instance.getPaymentMethods()).toThrowError(
+            expect.objectContaining({ code: ErrorCode.INSTANCE_DESTROYED })
+        );
+    });
+});

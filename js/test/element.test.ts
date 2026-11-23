@@ -917,7 +917,8 @@ describe('CheckoutElement typed, element-scoped listeners', () => {
         el.off('change', handler);
         transport.emit('change', change('el_a'));
         expect(handler).not.toHaveBeenCalled();
-        expect(transport.handlers.get('change')?.size ?? 0).toBe(0);
+        // Only the element's own state tracker (getState) stays subscribed.
+        expect(transport.handlers.get('change')?.size ?? 0).toBe(1);
     });
 
     it('destroy removes element listeners', () => {
@@ -942,5 +943,57 @@ describe('CheckoutElement typed, element-scoped listeners', () => {
             expectTypeOf(e).toEqualTypeOf<ChangeEvent>();
             return e.complete;
         });
+    });
+});
+
+describe('CheckoutElement.getState (input snapshot)', () => {
+    it('starts empty and incomplete', () => {
+        const el = makeElement(createMockTransport(), 'cardNumber', 'el_num');
+        expect(el.getState()).toEqual({ empty: true, complete: false });
+    });
+
+    it('tracks change events even when the merchant never subscribed', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_num');
+        transport.emit('change', { elementId: 'el_num', empty: false, complete: true, brand: 'visa' });
+        expect(el.getState()).toEqual({ empty: false, complete: true, brand: 'visa' });
+    });
+
+    it('carries the error of the last change and drops it once the field is valid again', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_num');
+        const error = { code: 'CARD_NUMBER_INVALID', message: 'x', category: 'validation' };
+        transport.emit('change', { elementId: 'el_num', empty: false, complete: false, error });
+        expect(el.getState()?.error).toEqual(error);
+        transport.emit('change', { elementId: 'el_num', empty: false, complete: true });
+        expect(el.getState()).toEqual({ empty: false, complete: true });
+    });
+
+    it("ignores another element's change events", () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_num');
+        transport.emit('change', { elementId: 'el_other', empty: false, complete: true });
+        expect(el.getState()).toEqual({ empty: true, complete: false });
+    });
+
+    it('returns a copy so callers cannot mutate the snapshot', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_num');
+        const state = el.getState();
+        if (state) state.complete = true;
+        expect(el.getState()?.complete).toBe(false);
+    });
+
+    it('is undefined for expressCheckout', () => {
+        expect(makeElement(createMockTransport(), 'expressCheckout', 'el_x').getState()).toBeUndefined();
+    });
+
+    it('stops listening after destroy and keeps the last snapshot readable', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'cardNumber', 'el_num');
+        transport.emit('change', { elementId: 'el_num', empty: false, complete: true });
+        el.destroy();
+        expect(transport.handlers.get('change')?.size ?? 0).toBe(0);
+        expect(el.getState()).toEqual({ empty: false, complete: true });
     });
 });

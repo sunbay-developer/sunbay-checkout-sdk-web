@@ -20,9 +20,11 @@ import {
     isIframeResizeMessage,
     type Appearance,
     type AvailableWallets,
+    type ChangeEvent,
     type CheckoutError,
     type CommandName,
     type ElementOptions,
+    type ElementState,
     type ElementStatus,
     type ElementType,
     type EventName,
@@ -209,6 +211,11 @@ export class CheckoutElement {
     /** expressCheckout only: the persistently subscribed expressAvailabilityChange handler (unbound on destroy). */
     private availabilityHandler: ((payload: unknown) => void) | null = null;
 
+    /** Input Elements only: the last `change` snapshot, tracked from construction (never replayed to `on`). */
+    private state: ElementState = { empty: true, complete: false };
+    /** Input Elements only: the persistently subscribed `change` handler (unbound on destroy). */
+    private stateHandler: ((payload: unknown) => void) | null = null;
+
     /** Merchant listeners registered via `on`: event → (original handler → transport wrapper). Cleared on destroy. */
     private readonly userListeners = new Map<EventName, Map<UserHandler, UserHandler>>();
 
@@ -235,6 +242,7 @@ export class CheckoutElement {
         this.onDestroy = opts.onDestroy;
         this.installInputActions();
         this.installExpressAvailability();
+        this.installInputState();
     }
 
     /** The current status (read-only snapshot, for external/test observation). */
@@ -253,6 +261,22 @@ export class CheckoutElement {
      */
     getAvailableWallets(): AvailableWallets | undefined {
         return this.availableWallets;
+    }
+
+    /**
+     * Input Elements only: the last known `change` state (`empty`, `complete`, `brand?`, `error?`).
+     *
+     * `change` events are not replayed, so a handler registered after `mount()` resolves can miss
+     * changes (e.g. browser autofill). Read this to get the current value instead; it is tracked from
+     * construction. Starts as `{ empty: true, complete: false }`. Never contains values.
+     *
+     * @returns A copy of the snapshot; undefined for `expressCheckout`. Still readable after destroy.
+     */
+    getState(): ElementState | undefined {
+        if (!INPUT_TYPES.includes(this.type)) {
+            return undefined;
+        }
+        return { ...this.state };
     }
 
     /**
@@ -516,6 +540,10 @@ export class CheckoutElement {
             this.transport.off('expressAvailabilityChange', this.availabilityHandler);
             this.availabilityHandler = null;
         }
+        if (this.stateHandler) {
+            this.transport.off('change', this.stateHandler);
+            this.stateHandler = null;
+        }
         for (const [event, wrappers] of this.userListeners) {
             for (const wrapper of wrappers.values()) {
                 this.transport.off(event, wrapper);
@@ -644,6 +672,32 @@ export class CheckoutElement {
         };
         this.availabilityHandler = handler;
         this.transport.on('expressAvailabilityChange', handler);
+    }
+
+    /** Input Elements only: keep the `change` snapshot current so `getState()` works without a listener. */
+    private installInputState(): void {
+        if (!INPUT_TYPES.includes(this.type)) {
+            return;
+        }
+        const handler = (payload: unknown): void => {
+            const change = payload as Partial<ChangeEvent> | null | undefined;
+            if (!change || change.elementId !== this.elementId) {
+                return;
+            }
+            const next: ElementState = {
+                empty: change.empty === true,
+                complete: change.complete === true,
+            };
+            if (change.brand !== undefined) {
+                next.brand = change.brand;
+            }
+            if (change.error !== undefined) {
+                next.error = change.error;
+            }
+            this.state = next;
+        };
+        this.stateHandler = handler;
+        this.transport.on('change', handler);
     }
 
     /** Send one input-class action command (synchronously throws INSTANCE_DESTROYED after destruction). */
