@@ -1,14 +1,26 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
+
+// Load test-e2e/.env.local (git-ignored) so local options such as E2E_HEADED / E2E_SLOWMO can
+// live there. Variables already set in the shell win over the file. A missing file is fine.
+try {
+    process.loadEnvFile(fileURLToPath(new URL('./.env.local', import.meta.url)));
+} catch {
+    // No .env.local: use shell variables and defaults only.
+}
 
 /**
  * Playwright config for the Checkout Web SDK real-device e2e suite.
  *
- * Environment (all optional, with safe local defaults):
+ * Environment (all optional, with safe local defaults; may also be set in test-e2e/.env.local,
+ * shell values win):
  * - E2E_HARNESS_ORIGIN  Test harness + backend origin (default http://localhost:8090)
  * - E2E_HOSTED_ORIGIN   Hosted runtime origin (default http://localhost:3000)
  * - E2E_STUB_ORIGIN     Optional stub runtime origin for PROTOCOL_UNSUPPORTED (default http://localhost:8099)
  * - E2E_WEBKIT         '1' adds a `webkit` project next to chromium (default: chromium only).
  *                        Requires `npx playwright install webkit`.
+ * - E2E_HEADED          '1' shows the browser (default: headless).
+ * - E2E_SLOWMO          Milliseconds to slow each action down (default: 0).
  * - E2E_HAVE_CREDENTIALS 'true' when server/.env.local has sandbox merchant credentials;
  *                        when unset/false, session-dependent tests are skipped (see support/env.ts).
  *
