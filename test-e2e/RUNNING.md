@@ -98,10 +98,11 @@ pnpm exec playwright test --grep "C2-02"
 # A single file
 pnpm exec playwright test tests/c4-theming.spec.ts
 
-# Browser visibility — runs HEADED by default so you can observe. For CI:
-E2E_HEADLESS=1 pnpm test
-# Adjust the headed slow-motion (ms) with E2E_SLOWMO (default 250)
-E2E_SLOWMO=0 pnpm test
+# Default: headless and full speed (no browser window, no slow-motion).
+# Show the browser:
+E2E_HEADED=1 pnpm test        # or: pnpm exec playwright test --headed
+# Slow each action down (ms); combine with E2E_HEADED=1 to watch:
+E2E_HEADED=1 E2E_SLOWMO=250 pnpm test
 ```
 
 Auto-skip logic:
@@ -159,7 +160,7 @@ test-e2e/
 ├── test-cases.md           46 structured cases (blueprint)
 ├── RUNNING.md              This file
 ├── package.json            @sunbay/checkout-sdk-e2e (workspace package, not published)
-├── playwright.config.ts    Auto-starts the test backend, reporters, timeouts, headed default
+├── playwright.config.ts    Auto-starts the test backend, reporters, timeouts, headless default
 ├── tsconfig.json
 ├── .env.example            Credentials template (copy to .env.local)
 ├── server/

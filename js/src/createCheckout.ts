@@ -56,10 +56,12 @@ export interface CreateCheckoutOptions {
     /**
      * Customer grant credential for card on file (saved cards), optional. Returned by the merchant
      * backend for an authenticated end user (for example with `customerId` in `create-session`).
-     * Set once at creation; to change it, create a new checkout. Hand it to the browser over an
+     * Set once at creation; to change it, create a new checkout. `null`, empty or blank means not
+     * provided (no card on file), so the `create-session` value can be passed through as is. Any
+     * other non-string rejects with `INVALID_OPTIONS`. Hand it to the browser over an
      * authenticated HTTPS response; never put it in a URL or write it to logs.
      */
-    customerAccessSecret?: string;
+    customerAccessSecret?: string | null;
     /** Runtime environment (dev/test/prod), defaults to prod. */
     env?: Env;
     /** Override the hosted origin (takes precedence over env). */
@@ -125,6 +127,10 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
     if (typeof opts.checkoutClientSecret !== 'string' || opts.checkoutClientSecret.trim() === '') {
         throw makeError(ErrorCode.INVALID_OPTIONS, 'checkoutClientSecret is required');
     }
+    const customerSecret = opts.customerAccessSecret;
+    if (customerSecret !== undefined && customerSecret !== null && typeof customerSecret !== 'string') {
+        throw makeError(ErrorCode.INVALID_OPTIONS, 'customerAccessSecret must be a string');
+    }
     const checkoutId = genId('co');
     const hostOrigin = resolveHostOrigin(opts.env, opts.hostOrigin);
     const factory = opts.__transportFactory ?? defaultTransportFactory;
@@ -159,7 +165,10 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
     const initReq: InitializeReq = {
         sessionId: opts.sessionId,
         checkoutClientSecret: opts.checkoutClientSecret,
-        customerAccessSecret: opts.customerAccessSecret,
+        // Not provided (undefined / null / blank) is omitted from the wire entirely.
+        ...(typeof customerSecret === 'string' && customerSecret.trim() !== ''
+            ? { customerAccessSecret: customerSecret }
+            : {}),
         locale: opts.locale,
         appearance: opts.appearance,
         paymentMethods: opts.paymentMethods,

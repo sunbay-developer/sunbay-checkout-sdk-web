@@ -287,7 +287,10 @@ export type ElementType =
     | 'address'
     | 'expressCheckout';
 
-/** Card on file (saved card) options of the card Element. */
+/**
+ * Card on file (saved card) options of the card Element. Fixed at creation: the card Element
+ * does not support `update()`, so recreate it to change these.
+ */
 export interface CardOnFileOptions {
     /**
      * Host switch for card on file. Defaults to `true`. Card on file is effective only when the

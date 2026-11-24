@@ -224,6 +224,52 @@ describe('createCheckout customerAccessSecret', () => {
     });
 });
 
+describe('createCheckout customerAccessSecret validation', () => {
+    async function initPayloadFor(value: unknown) {
+        const transport = createMockTransport();
+        const promise = createCheckout({
+            sessionId: 'sess_1',
+            checkoutClientSecret: 'ccs_test',
+            customerAccessSecret: value as string,
+            hostOrigin: HOST_ORIGIN,
+            __transportFactory: () => transport,
+        });
+        await Promise.resolve();
+        transport.fireHello(makeHello());
+        await promise;
+        return transport.requests.find((r) => r.name === 'initialize')?.payload;
+    }
+
+    it.each([null, undefined, '', '   '])(
+        'treats %o as not provided (no card on file) and omits it from initialize',
+        async (value) => {
+            expect(JSON.stringify(await initPayloadFor(value))).not.toContain('customerAccessSecret');
+        }
+    );
+
+    it.each([123, true, {}, []])('rejects INVALID_OPTIONS for a non-string %o', async (bad) => {
+        const transport = createMockTransport();
+        await expect(
+            createCheckout({
+                sessionId: 'sess_1',
+                checkoutClientSecret: 'ccs_test',
+                customerAccessSecret: bad as unknown as string,
+                hostOrigin: HOST_ORIGIN,
+                __transportFactory: () => transport,
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_OPTIONS' });
+    });
+
+    it('accepts null at the type level (create-session returns null without customerId)', () => {
+        const opts: Parameters<typeof createCheckout>[0] = {
+            sessionId: 's',
+            checkoutClientSecret: 'c',
+            customerAccessSecret: null,
+        };
+        expect(opts.customerAccessSecret).toBeNull();
+    });
+});
+
 describe('createCheckout checkoutClientSecret', () => {
     it('rejects INVALID_OPTIONS for a missing, blank or non-string checkoutClientSecret', async () => {
         for (const bad of [undefined, '', '   ', null, 123]) {

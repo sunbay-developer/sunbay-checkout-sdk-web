@@ -9,8 +9,9 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 ### Added
 
 - Card on file (saved cards) in the `card` Element. New optional `createCheckout` option
-  `customerAccessSecret` (held in runtime memory only, set once) and new `card` Element option
-  `cardOnFile: { enabled?, saveByDefault? }`. The `card` Element `change` event gains optional
+  `customerAccessSecret` (held in runtime memory only, set once; `null` or blank means none, a
+  non-string rejects with `INVALID_OPTIONS`) and new `card` Element option
+  `cardOnFile: { enabled?, saveByDefault? }` (fixed at creation). The `card` Element `change` event gains optional
   `cardSource` (`'new' | 'saved'`) and `savePaymentMethod`. `confirm()` is unchanged. New type
   `CardOnFileOptions`. Requires a hosted runtime that supports card on file; without
   `customerAccessSecret` behavior is unchanged.
