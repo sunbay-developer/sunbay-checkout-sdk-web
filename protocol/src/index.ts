@@ -89,6 +89,7 @@ export {
     type PaymentMethodFilter,
     type ElementType,
     type CardElementOptions,
+    type CardOnFileOptions,
     type CardFieldElementOptions,
     type AddressElementOptions,
     type AddressFormStyle,

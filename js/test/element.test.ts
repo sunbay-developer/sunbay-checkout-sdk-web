@@ -120,6 +120,22 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
+describe('CheckoutElement cardOnFile option', () => {
+    it('forwards cardOnFile unchanged in the createElement command', () => {
+        const transport = createMockTransport();
+        const el = makeElement(transport, 'card', 'el_card', undefined, undefined, {
+            cardOnFile: { enabled: false, saveByDefault: true },
+        });
+        makeContainer('cof-target');
+        void el.mount('#cof-target');
+        const create = transport.requests.find((r) => r.name === 'createElement');
+        expect(create?.payload).toMatchObject({
+            type: 'card',
+            options: { cardOnFile: { enabled: false, saveByDefault: true } },
+        });
+    });
+});
+
 describe('CheckoutElement.mount', () => {
     it('inserts a visible iframe into the container and resolves after elementReady', async () => {
         const transport = createMockTransport();

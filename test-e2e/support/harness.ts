@@ -30,6 +30,12 @@ export interface HarnessConfig {
     paymentMethods?: Record<string, unknown>;
     collectBillingAddress?: boolean;
     collectShippingAddress?: boolean;
+    /** COF: stable merchant-side customer id; makes create-session issue a customerAccessSecret. */
+    customerId?: string;
+    /** COF: override the issued customerAccessSecret (for example to test a wrong secret). */
+    customerAccessSecret?: string;
+    /** COF: whether the session allows saving cards (backend default applies when omitted). */
+    supportStoreCard?: boolean;
     elements?: ElementSpec[];
 }
 export interface SetupResult {

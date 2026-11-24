@@ -119,6 +119,8 @@ class Harness {
                     body: JSON.stringify({
                         collectBillingAddress: config.collectBillingAddress,
                         collectShippingAddress: config.collectShippingAddress,
+                        customerId: config.customerId,
+                        supportStoreCard: config.supportStoreCard,
                     }),
                 });
                 if (!res.ok) {
@@ -137,6 +139,7 @@ class Harness {
                             ok: true,
                             sessionId: body.sessionId,
                             checkoutClientSecret: body.checkoutClientSecret,
+                            customerAccessSecret: body.customerAccessSecret ?? undefined,
                         };
                     }
                 }
@@ -170,6 +173,7 @@ class Harness {
         // 1. Obtain a sessionId + checkoutClientSecret.
         let sessionId;
         let checkoutClientSecret;
+        let customerAccessSecret;
         if (config.session === 'auto') {
             const created = await this._createSession(config);
             if (!created.ok) {
@@ -177,6 +181,7 @@ class Harness {
             }
             sessionId = created.sessionId;
             checkoutClientSecret = created.checkoutClientSecret;
+            customerAccessSecret = created.customerAccessSecret;
         } else {
             sessionId = config.session;
             checkoutClientSecret = config.checkoutClientSecret;
@@ -189,6 +194,8 @@ class Harness {
             instance = await createCheckout({
                 sessionId,
                 checkoutClientSecret,
+                // A test may override the issued secret (for example with a wrong one).
+                customerAccessSecret: config.customerAccessSecret ?? customerAccessSecret,
                 env: config.env,
                 hostOrigin,
                 locale: config.locale,

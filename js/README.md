@@ -37,6 +37,7 @@ const outcome = await checkout.confirm();
 | --- | --- |
 | `sessionId` | Required. Server-created session id. |
 | `checkoutClientSecret` | Required. Returned by your backend's `create-session` when `sessionType` is `'embedded'`. Pass it to the browser over an authenticated HTTPS response only; never put it in a URL or write it to logs. A missing, blank or non-string value rejects with `INVALID_OPTIONS`. |
+| `customerAccessSecret` | Optional. Enables saved cards in the `card` Element for an authenticated end user (returned by your backend, for example when `create-session` is called with a `customerId`). Set once; create a new checkout to change it. Never put it in a URL or write it to logs. Control the behavior with the `card` Element option `cardOnFile: { enabled?, saveByDefault? }`. |
 | `env` | `'dev' \| 'test' \| 'prod'` (default `'prod'`). Selects the hosted origin. |
 | `hostOrigin` | Overrides the hosted origin (takes precedence over `env`), e.g. `http://localhost:3000`. |
 | `locale` | UI locale, e.g. `'en-US'`, `'zh-CN'`. |

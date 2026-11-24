@@ -485,6 +485,22 @@ See `harness-design.md` §7 "Cross-origin assertion rule".
 
 ---
 
+## 8a. C9 card on file (saved cards)
+
+Spec: `checkout-hosted/docs/superpowers/specs/2026-11-23-sdk-cof-design.md`. Sessions pass a unique
+`customerId` and `supportStoreCard: true` (the backend defaults it to `false`).
+
+### C9-01 no customerAccessSecret -> card Element unchanged
+No saved-card list, no "Save this card" checkbox.
+
+### C9-02 wrong customerAccessSecret -> degrade and pay
+`card/list` is rejected; the Element shows the new-card form and a new-card payment succeeds.
+
+### C9-03 save a new card, then pay with it on a new session
+Session 1: new card + "Save this card" -> `succeeded`. Session 2 (same customer): the card is listed
+and selected by default (`•••• <last4>`), `change` reports `cardSource: 'saved'`, no event carries
+`sc_` / `cas_` values, and `confirm()` -> `succeeded`.
+
 ## 9. Coverage map (case -> SDK capability)
 
 | SDK capability | Cases |

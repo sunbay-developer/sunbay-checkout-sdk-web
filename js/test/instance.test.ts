@@ -133,7 +133,7 @@ function createMockTransport(): MockTransport {
 /** Start createCheckout and drive hello on the next tick, returning the instance and mock. */
 async function bootstrap(
     overrides?: (t: MockTransport) => void,
-    createOpts?: { appearance?: Appearance; locale?: string }
+    createOpts?: { appearance?: Appearance; locale?: string; customerAccessSecret?: string }
 ): Promise<{ instance: CheckoutInstance; transport: MockTransport }> {
     const transport = createMockTransport();
     overrides?.(transport);
@@ -143,6 +143,7 @@ async function bootstrap(
         hostOrigin: HOST_ORIGIN,
         appearance: createOpts?.appearance,
         locale: createOpts?.locale,
+        customerAccessSecret: createOpts?.customerAccessSecret,
         __transportFactory: () => transport,
     });
     // Wait until createHiddenIframe is called & onHello is registered before firing the handshake.
@@ -200,6 +201,26 @@ describe('createCheckout', () => {
         await expect(promise).rejects.toMatchObject({
             code: ErrorCode.PROTOCOL_UNSUPPORTED,
         });
+    });
+});
+
+describe('createCheckout customerAccessSecret', () => {
+    it('sends customerAccessSecret in the initialize payload when provided', async () => {
+        const { transport } = await bootstrap(undefined, { customerAccessSecret: 'cas_test' });
+        const init = transport.requests.find((r) => r.name === 'initialize');
+        expect(init?.payload).toMatchObject({ customerAccessSecret: 'cas_test' });
+    });
+
+    it('omits customerAccessSecret from the initialize payload when not provided', async () => {
+        const { transport } = await bootstrap();
+        const init = transport.requests.find((r) => r.name === 'initialize');
+        expect(JSON.stringify(init?.payload)).not.toContain('customerAccessSecret');
+    });
+
+    it('does not keep the secret on the instance', async () => {
+        const { instance } = await bootstrap(undefined, { customerAccessSecret: 'cas_test' });
+        const rest = Object.entries(instance).filter(([key]) => key !== 'transport');
+        expect(JSON.stringify(rest)).not.toContain('cas_test');
     });
 });
 
