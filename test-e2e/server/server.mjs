@@ -120,6 +120,14 @@ async function createSession(input) {
         merchantReturnUrl: input.returnUrl ?? '',
         notifyUrl: input.returnUrl ?? '',
         sessionType: 'embedded',
+        // Card on file (COF) cases: a stable customerId makes the open platform issue a
+        // customerAccessSecret and scopes saved cards to that customer.
+        ...(typeof input.customerId === 'string' && input.customerId
+            ? { customerId: input.customerId }
+            : {}),
+        ...(typeof input.supportStoreCard === 'boolean'
+            ? { supportStoreCard: input.supportStoreCard }
+            : {}),
     };
 
     const res = await fetch(`${CONFIG.openApiUrl}/v2/checkout/session/create`, {
@@ -210,6 +218,7 @@ const server = createServer(async (req, res) => {
                 sendJson(res, 200, {
                     sessionId: data.sessionId,
                     checkoutClientSecret: data.checkoutClientSecret,
+                    customerAccessSecret: data.customerAccessSecret ?? null,
                     session: data,
                 });
             } catch (err) {
