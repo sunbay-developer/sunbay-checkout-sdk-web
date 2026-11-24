@@ -6,6 +6,8 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-24
+
 ### Added
 
 - Card on file (saved cards) in the `card` Element. New optional `createCheckout` option
