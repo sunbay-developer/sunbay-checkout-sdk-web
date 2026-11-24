@@ -65,6 +65,15 @@ export interface ChangeEvent {
     error?: CheckoutError;
     /** Only the card number field may carry brand; never contains card values. */
     brand?: string;
+    /**
+     * Only the card Element with card on file in effect: whether a saved card (`'saved'`) or a new
+     * card (`'new'`) is selected. When `'saved'`, `complete` is `true` (no extra input needed).
+     * When `'new'`, `complete` is `false`: the card Element does not report the completeness of
+     * the new-card form (it is validated by `confirm()`). Never identifies which saved card.
+     */
+    cardSource?: 'new' | 'saved';
+    /** Only the card Element with card on file in effect: whether "save this card" is ticked. */
+    savePaymentMethod?: boolean;
 }
 export interface FocusEvent {
     elementId: string;

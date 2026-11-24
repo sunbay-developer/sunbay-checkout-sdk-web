@@ -53,6 +53,13 @@ export interface CreateCheckoutOptions {
      * response; never put it in a URL or write it to logs.
      */
     checkoutClientSecret: string;
+    /**
+     * Customer grant credential for card on file (saved cards), optional. Returned by the merchant
+     * backend for an authenticated end user (for example with `customerId` in `create-session`).
+     * Set once at creation; to change it, create a new checkout. Hand it to the browser over an
+     * authenticated HTTPS response; never put it in a URL or write it to logs.
+     */
+    customerAccessSecret?: string;
     /** Runtime environment (dev/test/prod), defaults to prod. */
     env?: Env;
     /** Override the hosted origin (takes precedence over env). */
@@ -152,6 +159,7 @@ export async function createCheckout(opts: CreateCheckoutOptions): Promise<Check
     const initReq: InitializeReq = {
         sessionId: opts.sessionId,
         checkoutClientSecret: opts.checkoutClientSecret,
+        customerAccessSecret: opts.customerAccessSecret,
         locale: opts.locale,
         appearance: opts.appearance,
         paymentMethods: opts.paymentMethods,

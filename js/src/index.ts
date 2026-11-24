@@ -48,6 +48,7 @@ export {
     type ElementOptions,
     type ElementStatus,
     type CardElementOptions,
+    type CardOnFileOptions,
     type CardFieldElementOptions,
     type AddressElementOptions,
     type AddressFormStyle,

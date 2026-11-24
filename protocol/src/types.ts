@@ -287,8 +287,22 @@ export type ElementType =
     | 'address'
     | 'expressCheckout';
 
+/** Card on file (saved card) options of the card Element. */
+export interface CardOnFileOptions {
+    /**
+     * Host switch for card on file. Defaults to `true`. Card on file is effective only when the
+     * session allows it, this switch is on, and `customerAccessSecret` was provided at
+     * `createCheckout`. The host can turn it off, never on.
+     */
+    enabled?: boolean;
+    /** Whether the "save this card" checkbox starts ticked. Defaults to `false`. */
+    saveByDefault?: boolean;
+}
+
 /** card Element options (spec 6). */
 export interface CardElementOptions {
+    /** Saved card behavior; see {@link CardOnFileOptions}. */
+    cardOnFile?: CardOnFileOptions;
     showBillingAddress?: boolean;
     showShippingAddress?: boolean;
     showPostalCode?: boolean;

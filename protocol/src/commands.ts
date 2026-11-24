@@ -71,6 +71,12 @@ export interface InitializeReq {
      * `create-session` call when `sessionType` is `embedded`. Never log it or put it in a URL.
      */
     checkoutClientSecret?: string;
+    /**
+     * Customer grant credential for card on file (saved cards), issued by the merchant backend
+     * for an authenticated end user. Optional. Held in runtime memory only and set once at
+     * initialization. Never log it or put it in a URL.
+     */
+    customerAccessSecret?: string;
 }
 export interface InitializeResp {
     capabilities: string[];
