@@ -103,6 +103,8 @@ pnpm exec playwright test tests/c4-theming.spec.ts
 E2E_HEADED=1 pnpm test        # or: pnpm exec playwright test --headed
 # Slow each action down (ms); combine with E2E_HEADED=1 to watch:
 E2E_HEADED=1 E2E_SLOWMO=250 pnpm test
+# Or set E2E_HEADED / E2E_SLOWMO in test-e2e/.env.local (commented out there by default;
+# shell values win over the file).
 ```
 
 Auto-skip logic:
