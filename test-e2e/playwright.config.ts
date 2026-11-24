@@ -38,12 +38,11 @@ export default defineConfig({
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         video: 'retain-on-failure',
-        // Real-device runs default to a HEADED browser so the effect is observable.
-        // Set E2E_HEADLESS=1 (e.g. in CI) to run headless.
-        headless: process.env.E2E_HEADLESS === '1',
+        // Headless and full speed by default. Opt in separately:
+        // E2E_HEADED=1 (or `--headed`) shows the browser; E2E_SLOWMO=<ms> slows each action.
+        headless: process.env.E2E_HEADED !== '1',
         launchOptions: {
-            // Slow down actions a bit so the mounting/theming/payment flow is visible.
-            slowMo: process.env.E2E_HEADLESS === '1' ? 0 : Number(process.env.E2E_SLOWMO ?? 250),
+            slowMo: Number(process.env.E2E_SLOWMO) > 0 ? Number(process.env.E2E_SLOWMO) : 0,
         },
     },
     projects: [
