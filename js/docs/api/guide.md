@@ -82,7 +82,7 @@ contract package.
 ### Requirements
 
 - A modern browser with `postMessage`, `MessageChannel`, and `ResizeObserver`.
-- A valid `sessionId` obtained from your server.
+- A valid `sessionId` and its `checkoutClientSecret`, both obtained from your server.
 - Network access to the Sunbay-hosted checkout origin (configured via `env` or
   `hostOrigin`).
 
@@ -96,6 +96,7 @@ import { createCheckout } from '@sunbay/checkout-sdk-js';
 // 1. Create the checkout instance from a server-created session.
 const checkout = await createCheckout({
     sessionId, // obtained from your backend
+    checkoutClientSecret, // returned by create-session
     env: 'prod',
 });
 
@@ -216,7 +217,7 @@ from the latest transaction's `txnStatus`. A failed attempt leaves a multi-attem
 ### 6.1 Combined card Element with billing address
 
 ```ts
-const checkout = await createCheckout({ sessionId, env: 'prod' });
+const checkout = await createCheckout({ sessionId, checkoutClientSecret, env: 'prod' });
 
 const card = checkout.create('card', {
     showBillingAddress: true,
@@ -233,7 +234,7 @@ const outcome = await checkout.confirm({
 ### 6.2 Split card fields with a separate address Element
 
 ```ts
-const checkout = await createCheckout({ sessionId, env: 'prod' });
+const checkout = await createCheckout({ sessionId, checkoutClientSecret, env: 'prod' });
 
 await checkout.create('cardNumber').mount('#card-number');
 await checkout.create('cardExpiry').mount('#card-expiry');
@@ -252,6 +253,7 @@ const outcome = await checkout.confirm();
 ```ts
 const checkout = await createCheckout({
     sessionId,
+    checkoutClientSecret,
     env: 'prod',
     // Backend identifiers, case-sensitive: CARD = all card brands.
     paymentMethods: { hide: ['APPLE_PAY'], order: ['CARD', 'GOOGLE_PAY'] },
@@ -289,10 +291,41 @@ Apple Pay / Google Pay then skip asking for any address that is **complete** (sh
 phone too). If you use our Address Element for a mode, that Element wins and the address passed here is
 ignored with a `warning`. See `api.md` → "Host-provided addresses".
 
+### 6.2d Saved cards (card on file)
+
+```ts
+const checkout = await createCheckout({
+    sessionId,
+    checkoutClientSecret,
+    // Issued by your backend for the signed-in end user (create-session with a customerId).
+    // null or blank means "not provided": the card Element then shows no saved cards.
+    customerAccessSecret,
+});
+
+const card = checkout.create('card', {
+    cardOnFile: { enabled: true, saveByDefault: false },
+});
+await card.mount('#card');
+
+card.on('change', (e) => {
+    // 'saved': a saved card is selected and e.complete is true.
+    // 'new': a new card is being typed; e.complete stays false, confirm() validates it.
+    console.log(e.cardSource, e.savePaymentMethod);
+});
+
+const outcome = await checkout.confirm();
+```
+
+Card on file is in effect only when the session was created with `supportStoreCard: true`,
+`cardOnFile.enabled` is not `false`, and `customerAccessSecret` was passed. The host can turn it off,
+never on. `cardOnFile` is fixed at creation: recreate the Element to change it. Hand
+`customerAccessSecret` to the browser over an authenticated HTTPS response, and never put it in a URL
+or write it to logs. See `api.md` → `CardOnFileOptions`.
+
 ### 6.3 Express checkout (Apple Pay / Google Pay)
 
 ```ts
-const checkout = await createCheckout({ sessionId, env: 'prod' });
+const checkout = await createCheckout({ sessionId, checkoutClientSecret, env: 'prod' });
 
 const express = checkout.create('expressCheckout', {
     paymentMethods: {
@@ -369,6 +402,7 @@ Appearance has three parts:
 ```ts
 await createCheckout({
     sessionId,
+    checkoutClientSecret,
     appearance: { colorScheme: 'dark' }, // 'light' | 'dark' | 'auto'
 });
 ```
@@ -385,6 +419,7 @@ await checkout.updateCheckout({ appearance: { colorScheme: 'dark' } });
 ```ts
 await createCheckout({
     sessionId,
+    checkoutClientSecret,
     appearance: {
         variables: {
             colorPrimary: '#2266ee',
@@ -411,6 +446,7 @@ every property/value.
 ```ts
 await createCheckout({
     sessionId,
+    checkoutClientSecret,
     appearance: {
         rules: {
             input: { padding: '12px' },

@@ -59,8 +59,10 @@ import type {
     ElementOptions,
     ElementStatus,
     CardElementOptions,
+    CardOnFileOptions,
     CardFieldElementOptions,
     AddressElementOptions,
+    AddressFormStyle,
     ExpressCheckoutElementOptions,
 } from '@sunbay/checkout-sdk-js';
 ```
@@ -100,6 +102,8 @@ The returned Promise **rejects** when:
 ```ts
 interface CreateCheckoutOptions {
     sessionId: string; // required — server-created session id
+    checkoutClientSecret: string; // required — per-session secret returned by create-session
+    customerAccessSecret?: string | null; // optional — enables saved cards (card on file)
     env?: Env; // 'dev' | 'test' | 'prod', default 'prod'
     hostOrigin?: string; // override the hosted origin (takes precedence over env)
     locale?: string; // e.g. 'en', 'zh'
@@ -113,6 +117,8 @@ interface CreateCheckoutOptions {
 | Field            | Type                 | Required | Notes                                                                 |
 | ---------------- | -------------------- | -------- | --------------------------------------------------------------------- |
 | `sessionId`      | `string`             | yes      | Created by your backend; cannot be replaced for the instance's life.  |
+| `checkoutClientSecret` | `string`       | yes      | Per-session secret returned by `create-session` (for `embedded` sessions). Empty or non-string rejects with `INVALID_OPTIONS`. Pass it to the browser over an authenticated HTTPS response; never put it in a URL or write it to logs. |
+| `customerAccessSecret` | `string \| null` | no    | Customer grant credential for card on file (saved cards), issued by your backend for an authenticated end user (for example `create-session` with a `customerId`). Set once; create a new checkout to change it. `null`, empty or blank means not provided, so the `create-session` value can be passed through as is. Any other non-string rejects with `INVALID_OPTIONS`. Held in runtime memory only; never put it in a URL or write it to logs. See [`CardOnFileOptions`](#cardonfileoptions). |
 | `env`            | `Env`                | no       | Selects a built-in hosted origin. Defaults to `'prod'`.               |
 | `hostOrigin`     | `string`             | no       | Explicit origin (no trailing slash); overrides `env`. For local dev/tests. |
 | `locale`         | `string`             | no       | Falls back to the session's language, then `en`.                      |
@@ -127,6 +133,7 @@ interface CreateCheckoutOptions {
 ```ts
 const checkout = await createCheckout({
     sessionId: 'sess_x',
+    checkoutClientSecret: 'cs_x', // from create-session
     env: 'prod',
     locale: 'en',
     appearance: { colorScheme: 'light', variables: { colorPrimary: '#2266ee' } },
@@ -455,6 +462,7 @@ type ElementOptions =
 
 ```ts
 interface CardElementOptions {
+    cardOnFile?: CardOnFileOptions;
     showBillingAddress?: boolean;
     showShippingAddress?: boolean;
     showPostalCode?: boolean;
@@ -464,6 +472,22 @@ interface CardElementOptions {
 
 `show*` flags default to following the session's `collect*` flags; an explicit
 `false` only hides the UI and does not relax the backend requirement.
+
+#### `CardOnFileOptions`
+
+```ts
+interface CardOnFileOptions {
+    enabled?: boolean;       // default true; host switch, can only turn card on file off
+    saveByDefault?: boolean; // default false; whether "save this card" starts ticked
+}
+```
+
+Card on file (saved cards) is in effect only when all three hold: the session allows it
+(`supportStoreCard: true` at `create-session`), `cardOnFile.enabled` is not `false`, and
+`customerAccessSecret` was passed to `createCheckout`. Otherwise the `card` Element behaves as before.
+The options are fixed at creation: the `card` Element does not support `update()`, so recreate it to
+change them. `confirm()` is unchanged. The `change` event reports the selection through `cardSource`
+and `savePaymentMethod` (see [Element-level events](#element-level-events)).
 
 ### `CardFieldElementOptions` (`cardNumber` / `cardExpiry` / `cardCvc`)
 
@@ -815,7 +839,7 @@ type EventName =
 | -------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
 | `ready`        | `{ elementId }`                                                     | Fired once per successful mount.                         |
 | `elementReady` | `{ elementId; availableWallets? }`                                  | `availableWallets` only for `expressCheckout`.           |
-| `change`       | `{ elementId; empty; complete; error?; brand? }`                    | `brand` only on the card-number field. Never a card value. |
+| `change`       | `{ elementId; empty; complete; error?; brand?; cardSource?; savePaymentMethod? }` | `brand` only on the card-number field. `cardSource` (`'new' \| 'saved'`) and `savePaymentMethod` ("save this card" ticked) only on the `card` Element with card on file in effect. With `'saved'`, `complete` is `true`. With `'new'`, `complete` is `false`: the new-card form is validated by `confirm()`. Never identifies which saved card, never a card value. |
 | `focus`        | `{ elementId }`                                                     | No input value.                                          |
 | `blur`         | `{ elementId }`                                                     | No input value.                                          |
 | `loadError`    | `{ elementId; error: CheckoutError }`                              | Same error id as the corresponding `mount()` rejection.  |
@@ -842,7 +866,7 @@ Events carry changes only. Read the current value with `Element.getState()` (inp
 | -------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
 | `paymentStateChange` | `{ operationId; method; state; action? }`            | Intermediate/process info only.                              |
 | `paymentResult`      | `{ operationId; method; outcome: PaymentOutcome }`   | Covers card and express. Fulfills the matching `confirm()`.  |
-| `error`              | `{ operationId?; error: CheckoutError }`             | Async proactive-flow error (e.g. a wallet failure).          |
+| `error`              | `{ operationId?; error: CheckoutError; method?; stage? }` | Async proactive-flow error (e.g. a wallet failure).          |
 | `warning`            | `{ code; ignored: string[]; reason: string }`        | Non-fatal: merchant input was ignored (see `WarningEvent`).  |
 
 ```ts
@@ -869,8 +893,13 @@ interface CheckoutError {
     elementId?: string;
     field?: string;
     traceId?: string;
+    providerCode?: string;       // sanitized wallet-provider error name or code, if any
+    paymentStateKnown?: boolean; // false: the outcome is unknown, do NOT blindly retry
 }
 ```
+
+`paymentStateKnown: false` means the payment outcome is unknown. Reconcile with `getPaymentStatus()`
+before any retry.
 
 The `ErrorCode` constant provides the string codes:
 
