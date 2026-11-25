@@ -85,3 +85,31 @@ pnpm --filter @sunbay/checkout-sdk-js run build        # tsup: esm+cjs+iife+dts
 - Changing handshake / transport / protocol logic is sensitive: state clearly
   what was verified and what was not; breaking protocol changes must bump major
   per `protocol/AGENTS.md`.
+
+---
+
+## 6. API documentation contract
+
+The public API is documented in `docs/api/api.md` (reference) and `docs/api/guide.md` (integration
+guide). They are part of the product and must not drift from the code.
+
+**Triggers.** Any change that affects what an integrator sees or calls:
+- Adding, removing, renaming or re-typing a public export, `createCheckout` option, Element option,
+  method, event, event payload field or `CheckoutError` field (including re-exported protocol types).
+- Changing a default value, a requirement (optional ↔ required), a precedence rule or documented behavior.
+- Adding, removing or renaming an `ErrorCode`, a warning code or a payment outcome mapping.
+- Changing `Env` hosted origins or timeouts.
+
+**Required in the same change (same branch):**
+1. Update `docs/api/api.md` for every affected symbol, option, default, event field and error code.
+2. Update `docs/api/guide.md` where an example or a recommended flow is affected. Every
+   `createCheckout` example must pass all currently required options.
+3. Update `README.md` (options table) and `CHANGELOG.md` under `[Unreleased]`.
+4. Update `example/` and the e2e harness if they use the changed API.
+
+**Review gate.** Before reporting a task done, compare the `src/index.ts` exports and the protocol
+interfaces touched by the diff (`git diff -U0 -- src ../protocol/src`) against `docs/api/api.md`. A change to
+the public surface without a matching docs change is incomplete.
+
+**Doc rules.** English only. Document behavior and defaults as the code has them, not as intended.
+Never put real secrets or card values in examples.
