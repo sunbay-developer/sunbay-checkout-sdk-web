@@ -24,7 +24,7 @@ export async function fetchHealth() {
             ok: false,
             hasCredentials: false,
             sdkBuildPresent: false,
-            hostedOrigin: 'http://localhost:3000',
+            hostedOrigin: process.env.HOSTED_ORIGIN,
             error: String(err),
         };
     }

@@ -45,7 +45,7 @@ const SDK_DIST = join(EXAMPLE_ROOT, '..', 'dist');
 
 const CONFIG = {
     port: Number(process.env.PORT ?? 8095),
-    hostedOrigin: process.env.HOSTED_ORIGIN ?? 'http://localhost:3000',
+    hostedOrigin: process.env.HOSTED_ORIGIN,
 };
 
 /** Static file extension → Content-Type. */
