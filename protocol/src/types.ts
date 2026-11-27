@@ -389,7 +389,7 @@ export type GooglePayButtonType =
 export interface ApplePayOptions {
     /** Button theme; defaults to follow the current color scheme. */
     buttonTheme?: ApplePayButtonTheme;
-    /** Button text type; defaults to `'pay'`. */
+    /** Button text type; defaults to `'plain'` (brand mark without an additional label). */
     buttonType?: ApplePayButtonType;
 }
 
@@ -397,7 +397,7 @@ export interface ApplePayOptions {
 export interface GooglePayOptions {
     /** Button theme; defaults to follow the current color scheme. */
     buttonTheme?: GooglePayButtonTheme;
-    /** Button text type; defaults to `'pay'`. */
+    /** Button text type; defaults to `'plain'` (brand mark without an additional label). */
     buttonType?: GooglePayButtonType;
 }
 

@@ -220,3 +220,7 @@ const card = checkout.create('card', {
 ```
 
 These optional additions retain protocol major 1. Deploy a hosted runtime supporting these options before relying on the management restriction. Older runtimes may ignore unknown options. The switch controls SDK interactions, while backend credentials and scopes govern server authorization.
+
+## Wallet button defaults
+
+Apple Pay and Google Pay default to `buttonType: 'plain'`, displaying their official brand marks without an additional action label. Explicit `paymentMethods.applePay.buttonType` and `paymentMethods.googlePay.buttonType` choose each provider's supported wording. For example, use Apple `buy` and Google `pay`. Rendering and typography follow the provider's official button implementation. The default requires an updated hosted runtime.
