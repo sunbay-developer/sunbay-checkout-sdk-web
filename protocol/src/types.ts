@@ -231,7 +231,17 @@ export type AppearanceRuleTarget =
     | 'label'
     | 'error'
     | 'cardBrand'
-    | 'cvvIcon';
+    | 'cvvIcon'
+    | 'savedCardList'
+    | 'savedCard'
+    | 'savedCard:selected'
+    | 'savedCardDetails'
+    | 'savedCardExpiry'
+    | 'savedCardActions'
+    | 'savedCardAction'
+    | 'savedCardRemove'
+    | 'savedCardConfirmation'
+    | 'savedCardError';
 
 /**
  * A single rule: a mapping from whitelisted CSS properties (camelCase or kebab) to values.
@@ -292,6 +302,14 @@ export type ElementType =
  * does not support `update()`, so recreate it to change these.
  */
 export interface CardOnFileOptions {
+    /** Allow saved-card management and removal. Defaults to true. */
+    managementEnabled?: boolean;
+    /** Creation-time COF layout. Theme properties come from appearance. */
+    layout?: {
+        density?: 'comfortable' | 'compact';
+        actions?: 'inline' | 'stacked';
+    };
+
     /**
      * Host switch for card on file. Defaults to `true`. Card on file is effective only when the
      * session allows it, this switch is on, and `customerAccessSecret` was provided at

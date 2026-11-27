@@ -116,6 +116,7 @@ export async function createSession(input = {}) {
         merchantReturnUrl: input.returnUrl ?? '',
         notifyUrl: input.returnUrl ?? '',
         sessionType: 'embedded',
+        ...(typeof input.customerId === 'string' && input.customerId.length > 0 && input.customerId.length <= 64 ? { customerId: input.customerId } : {}),
     };
 
     const res = await fetch(`${CONFIG.openApiUrl}/v2/checkout/session/create`, {

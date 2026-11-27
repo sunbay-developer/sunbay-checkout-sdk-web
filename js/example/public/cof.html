@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Card on file acceptance — Sunbay Checkout SDK</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <nav class="topnav"><a href="/">All examples</a></nav>
+      <header class="hero">
+        <h1>Card on file acceptance</h1>
+        <p>
+          Use a Dev test customer. Save a card, then create a fresh session with
+          the same customer to verify reuse.
+        </p>
+        <div id="health" class="banner" hidden></div>
+      </header>
+      <section class="panel">
+        <div class="toolbar">
+          <label
+            >Demo customer
+            <input id="customer" value="sdk-cof-acceptance" maxlength="64"
+          /></label>
+          <label
+            ><input type="checkbox" id="credential" checked /> Include customer
+            credential</label
+          >
+          <label
+            ><input type="checkbox" id="enabled" checked /> Enable COF</label
+          >
+          <label
+            ><input type="checkbox" id="manage" checked /> Allow card
+            management</label
+          >
+          <label><input type="checkbox" id="save" /> Save by default</label>
+          <label
+            >Density
+            <select id="density">
+              <option>comfortable</option>
+              <option>compact</option>
+            </select></label
+          >
+          <label
+            >Actions
+            <select id="actions">
+              <option>inline</option>
+              <option>stacked</option>
+            </select></label
+          >
+          <label
+            >Theme
+            <select id="theme">
+              <option>light</option>
+              <option>dark</option>
+            </select></label
+          >
+          <label
+            ><input type="checkbox" id="custom" /> Custom COF spacing and
+            emphasis</label
+          >
+          <button id="init">Create fresh session</button
+          ><button id="destroy" disabled>Destroy</button>
+        </div>
+        <p id="status" role="status"></p>
+        <div id="slot-card" class="slot"></div>
+        <h3>Billing address</h3>
+        <div id="slot-bill" class="slot"></div>
+        <button id="pay" disabled>Pay with selected card</button>
+      </section>
+      <section class="panel">
+        <h2>Acceptance checklist</h2>
+        <p>
+          Mark each result after observing it. SDK events alone cannot prove
+          card persistence or removal.
+        </p>
+        <div id="checks"></div>
+      </section>
+      <pre id="log" class="log" aria-label="Sanitized event log"></pre>
+    </main>
+    <script src="/dist/index.global.js"></script>
+    <script type="module" src="/cof.js"></script>
+  </body>
+</html>
