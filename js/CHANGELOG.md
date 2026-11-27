@@ -6,6 +6,8 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+- Default wallet buttons to the official plain brand mark. Explicit button types remain supported.
+
 - Add COF semantic appearance rules, creation-time density/action layouts and default-on `managementEnabled`.
 - Add a COF acceptance Example covering save, reuse, removal and customization.
 
