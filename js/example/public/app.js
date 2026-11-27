@@ -86,8 +86,8 @@ export function getCreateCheckout() {
  * Ask the backend to create a checkout session with the sandbox merchant key.
  *
  * @param {{ collectBillingAddress?: boolean, collectShippingAddress?: boolean,
- *           items?: object[], currency?: string }} [variant] - Session variant.
- * @returns {Promise<{ sessionId: string, checkoutClientSecret: string }>} the created session
+ *           items?: object[], currency?: string, customerId?: string }} [variant] - Session variant.
+ * @returns {Promise<{ sessionId: string, checkoutClientSecret: string, customerAccessSecret?: string | null }>} the created session
  *          id and its client secret (never log the secret).
  * @throws {Error} with a readable message when the backend returns non-2xx.
  */
@@ -101,7 +101,11 @@ export async function createSession(variant = {}) {
     if (!res.ok || !body.sessionId || !body.checkoutClientSecret) {
         throw new Error(body.error || `create-session failed (HTTP ${res.status})`);
     }
-    return { sessionId: body.sessionId, checkoutClientSecret: body.checkoutClientSecret };
+    return {
+        sessionId: body.sessionId,
+        checkoutClientSecret: body.checkoutClientSecret,
+        customerAccessSecret: body.customerAccessSecret ?? null,
+    };
 }
 
 /**

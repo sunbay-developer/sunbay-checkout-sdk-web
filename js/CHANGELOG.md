@@ -6,6 +6,9 @@ All notable changes to `@sunbay/checkout-sdk-js` are documented here. The format
 
 ## [Unreleased]
 
+- Add COF semantic appearance rules, creation-time density/action layouts and default-on `managementEnabled`.
+- Add a COF acceptance Example covering save, reuse, removal and customization.
+
 ## [0.3.0] - 2026-11-24
 
 ### Added

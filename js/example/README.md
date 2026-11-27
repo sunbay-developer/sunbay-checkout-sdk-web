@@ -135,3 +135,9 @@ Card data is entered **only inside the hosted iframes** the SDK renders; it is
 RSA-encrypted locally in the hosted page and sent directly to the backend. The
 example pages, `app.js`, and the session-mock backend never touch card values —
 matching the SDK's security invariant.
+
+## COF acceptance
+
+Open `/cof.html`. Use a stable Dev demo customer to save a card and create another session with the same customer. The page offers COF and management switches, missing-credential mode, initial save choice, density, bottom-action layout, light/dark and sample semantic rules. Creation-time controls apply when Create fresh session is clicked.
+
+The page includes a manual Pending/Pass/Fail checklist. Persistence and removal must be checked through a fresh session and the backend result. Its sanitized log only records card source/completeness/save choice and payment status. Use Dev test cards and billing information. A missing credential, disabled COF, failed removal and final-card removal each have a checklist item. This page requires a runtime implementing the new options; build the SDK locally for unpublished protocol changes.

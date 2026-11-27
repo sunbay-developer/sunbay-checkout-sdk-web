@@ -962,3 +962,22 @@ These are transport/runtime policies, **not** payment deadlines. A payment that
 is still waiting resolves to `pending` and should be reconciled via
 `getPaymentStatus()`; a command timeout must never trigger an automatic
 re-`confirm()`.
+
+## COF management and layout
+
+`CardOnFileOptions.managementEnabled?: boolean` defaults to `true`. Set it to `false` to hide card management and reject removal inside the hosted runtime. Saved-card selection, new-card entry and the save checkbox remain available when COF itself is enabled.
+
+`CardOnFileOptions.layout` accepts `density?: 'comfortable' | 'compact'` and `actions?: 'inline' | 'stacked'`, defaulting to `comfortable` and `inline`. These options are fixed at Element creation. Recreate the Element to change them.
+
+COF inherits global appearance colors, fonts, border and radius. `AppearanceRuleTarget` additionally supports `savedCardList`, `savedCard`, `savedCard:selected`, `savedCardDetails`, `savedCardExpiry`, `savedCardActions`, `savedCardAction`, `savedCardRemove`, `savedCardConfirmation`, and `savedCardError`. The existing CSS property/value whitelist applies. Global and per-Element appearance precedence and live `updateCheckout` support are unchanged.
+
+```js
+const card = checkout.create('card', {
+    cardOnFile: {
+        managementEnabled: false,
+        layout: { density: 'compact', actions: 'stacked' },
+    },
+});
+```
+
+These optional additions retain protocol major 1. Deploy a hosted runtime supporting these options before relying on the management restriction. Older runtimes may ignore unknown options. The switch controls SDK interactions, while backend credentials and scopes govern server authorization.

@@ -163,6 +163,7 @@ const server = createServer(async (req, res) => {
                 sendJson(res, 200, {
                     sessionId: data.sessionId,
                     checkoutClientSecret: data.checkoutClientSecret,
+                    customerAccessSecret: data.customerAccessSecret ?? null,
                     session: data,
                 });
             } catch (err) {
